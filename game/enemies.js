@@ -57,14 +57,16 @@ class Enemy {
             this.speed = 60; // DÜZENLEME: Hız 80'den 60'a düştü
             this.hp = 400 * (1 + Game.gameLevel * 0.5); // Can 500'den 400'e düştü
             this.color = '#ff0000';
-            this.damage = 15; // DÜZENLEME: Hasar 25'ten 15'e düştü (Tek atmasın)
+            // GÜNCELLEME: Hasar 15'ten 5'e indirildi (Çok az hasar)
+            this.damage = 5; 
             this.xpValue = 100;
         } else {
             this.radius = 15;
             this.speed = 90 + Math.random() * 30; // DÜZENLEME: Hız 120'den 90'a düştü
             this.hp = 20 * (1 + Game.gameLevel * 0.2); // Can 30'dan 20'ye düştü
             this.color = '#ff5555';
-            this.damage = 5; // DÜZENLEME: Hasar 10'dan 5'e düştü (Artık çok daha az vuruyor)
+            // GÜNCELLEME: Hasar 5'ten 1'e indirildi (Minimum hasar)
+            this.damage = 1; 
             this.xpValue = 10;
         }
     }
