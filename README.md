@@ -91,8 +91,8 @@ Bu proje **MIT Lisansı** ile lisanslanmıştır. Bu lisans, kodu kısıtlama ol
 
 | Rol | Adı |
 | :--- | :--- |
-| **Proje Sahibi** | Nuri İL |
-| **Geliştirici** | Mehmet Fatih GÜLTEKİN |
-| **Geliştirici** | Fikri Efe AKAR |
+| **Proje Sahibi** | Nuri İL [nuriil](https://github.com/nuriil) |
+| **Geliştirici** | Mehmet Fatih GÜLTEKİN [Lifantel](https://github.com/Lifantel) |
+| **Geliştirici** | Fikri Efe AKAR [Ponggo01](https://github.com/Ponggo01) |
 
 Bu proje, web tabanlı basit oyunların ne kadar eğlenceli ve güçlü olabileceğini göstermek amacıyla kişisel bir çabayla geliştirilmiştir. İyi eğlenceler!
