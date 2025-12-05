@@ -91,6 +91,8 @@ Bu proje **MIT Lisansı** ile lisanslanmıştır. Bu lisans, kodu kısıtlama ol
 
 | Rol | Adı |
 | :--- | :--- |
-| **Oyun Geliştirici** | Nuri İL |
+| **Proje Sahibi** | Nuri İL |
+| **Geliştirici** | Mehmet Fatih GÜLTEKİN |
+| **Geliştirici** | Fikri Efe AKAR |
 
 Bu proje, web tabanlı basit oyunların ne kadar eğlenceli ve güçlü olabileceğini göstermek amacıyla kişisel bir çabayla geliştirilmiştir. İyi eğlenceler!
