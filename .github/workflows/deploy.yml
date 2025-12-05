@@ -39,7 +39,7 @@ jobs:
           # Dosyaların 'web survival shooter 2.0' klasörü içinde olduğu için
           # yolu buraya veriyoruz. Eğer dosyaları klasörden çıkarıp ana dizine
           # koyduysan burayı '.' olarak değiştir.
-          path: './web survival shooter 2.0'
+          path: ./
 
       - name: Yayına Al (Deploy)
         id: deployment
