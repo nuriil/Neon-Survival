@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Survival Shooter 2.0</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <div id="ui-layer">
+        <div id="hud-top">
+            <div class="bar-container">
+                <div id="hp-bar-fill" style="width: 100%;"></div>
+                <span id="hp-text">100/100</span>
+            </div>
+            <div id="score-container">KILL: <span id="score">0</span></div>
+        </div>
+
+        <div id="hud-bottom">
+            <div id="xp-bar-bg">
+                <div id="xp-bar-fill" style="width: 0%;"></div>
+            </div>
+            <div id="level-indicator">LVL <span id="level">1</span></div>
+        </div>
+
+        <div id="upgrade-modal" class="hidden">
+            <h2>LEVEL UP!</h2>
+            <div id="cards-container"></div>
+        </div>
+
+        <div id="start-screen">
+            <h1>NEON SURVIVOR</h1>
+            <p>Hayatta kalmak için hareket et ve ateş et.</p>
+            <button onclick="startGame()">OYUNA BAŞLA</button>
+        </div>
+        
+        <div id="game-over-screen" class="hidden">
+            <h1>ÖLDÜN</h1>
+            <p>Skor: <span id="final-score">0</span></p>
+            <button onclick="location.reload()">TEKRAR DENE</button>
+        </div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <script src="game/effects.js"></script>
+    <script src="game/ui.js"></script>
+    <script src="game/map.js"></script>
+    <script src="game/items.js"></script>
+    <script src="game/weapons.js"></script>
+    <script src="game/enemies.js"></script>
+    <script src="game/player.js"></script>
+    <script src="game/engine.js"></script>
+
+    <script>
+        function startGame() {
+            document.getElementById('start-screen').style.display = 'none';
+            Game.init();
+        }
+    </script>
+</body>
+</html>
