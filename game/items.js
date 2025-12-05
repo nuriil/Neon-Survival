@@ -1,0 +1,55 @@
+const ItemFactory = {
+    createXP: function(x, y, value) {
+        Game.items.push(new XPOrb(x, y, value));
+    }
+};
+
+class XPOrb {
+    constructor(x, y, value) {
+        this.x = x;
+        this.y = y;
+        this.value = value;
+        this.radius = 8;
+        this.markedForDeletion = false;
+        this.isMagnetized = false;
+        this.speed = 0;
+        this.acceleration = 1500;
+        
+        // Animasyon
+        this.floatOffset = Math.random() * Math.PI * 2;
+    }
+
+    update(dt) {
+        if (this.isMagnetized) {
+            // Oyuncuya doğru hızlanarak git
+            let dx = Game.player.x - this.x;
+            let dy = Game.player.y - this.y;
+            let dist = Math.sqrt(dx*dx + dy*dy);
+            
+            this.speed += this.acceleration * dt;
+            
+            this.x += (dx / dist) * this.speed * dt;
+            this.y += (dy / dist) * this.speed * dt;
+        }
+    }
+
+    draw(ctx) {
+        let bobY = Math.sin(Date.now() / 200 + this.floatOffset) * 3;
+        
+        ctx.beginPath();
+        ctx.arc(this.x, this.y + bobY, this.radius, 0, Math.PI * 2);
+        ctx.fillStyle = '#00ffaa'; // XP Rengi
+        ctx.fill();
+        
+        // Parlama
+        ctx.shadowColor = '#00ffaa';
+        ctx.shadowBlur = 10;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+    }
+
+    collect() {
+        this.markedForDeletion = true;
+        Game.player.gainXp(this.value);
+    }
+}
