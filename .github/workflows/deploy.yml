@@ -1,17 +1,20 @@
-name: Oyunu GitHub Pages'da Yayınla
+name: Deploy Game Production
 
 on:
+  # Main dalına her push yapıldığında çalışır
   push:
     branches: ["main"]
+  # Manuel tetikleme için
   workflow_dispatch:
 
+# Gerekli izinler (Token hatası almamak için şart)
 permissions:
   contents: read
   pages: write
   id-token: write
 
-# İŞTE BURASI DEĞİŞTİ
-# 'cancel-in-progress: true' diyerek eski işlemi iptal ediyoruz.
+# EŞZAMANLILIK AYARI (İstediğin özellik)
+# Yeni bir commit gelirse, devam eden eski deploy işlemini iptal eder.
 concurrency:
   group: "pages"
   cancel-in-progress: true
@@ -26,15 +29,18 @@ jobs:
       - name: Kodları Çek (Checkout)
         uses: actions/checkout@v4
 
-      - name: Pages Kurulumu
+      - name: GitHub Pages Yapılandırması
         uses: actions/configure-pages@v5
 
-      - name: Dosyaları Yükle (Upload Artifact)
+      - name: Dosyaları Hazırla (Upload)
         uses: actions/upload-pages-artifact@v3
         with:
-          # index.html dosyan ana dizindeyse burası '.' kalmalı.
-          path: '.'
+          # ÖNEMLİ DÜZELTME BURADA:
+          # Dosyaların 'web survival shooter 2.0' klasörü içinde olduğu için
+          # yolu buraya veriyoruz. Eğer dosyaları klasörden çıkarıp ana dizine
+          # koyduysan burayı '.' olarak değiştir.
+          path: './web survival shooter 2.0'
 
-      - name: GitHub Pages'a Deploy Et
+      - name: Yayına Al (Deploy)
         id: deployment
         uses: actions/deploy-pages@v4
