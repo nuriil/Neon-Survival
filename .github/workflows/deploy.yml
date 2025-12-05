@@ -1,0 +1,40 @@
+name: Oyunu GitHub Pages'da Yayınla
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# İŞTE BURASI DEĞİŞTİ
+# 'cancel-in-progress: true' diyerek eski işlemi iptal ediyoruz.
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Kodları Çek (Checkout)
+        uses: actions/checkout@v4
+
+      - name: Pages Kurulumu
+        uses: actions/configure-pages@v5
+
+      - name: Dosyaları Yükle (Upload Artifact)
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # index.html dosyan ana dizindeyse burası '.' kalmalı.
+          path: '.'
+
+      - name: GitHub Pages'a Deploy Et
+        id: deployment
+        uses: actions/deploy-pages@v4
