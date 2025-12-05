@@ -1,11 +1,11 @@
 const EnemySpawner = {
     timer: 0,
-    spawnRate: 1.0, // Saniyede bir
+    spawnRate: 2.0, // BAŞLANGIÇ: 1.0 yerine 2.0 saniye yaptık (Daha yavaş başlasın)
     difficultyMultiplier: 1.0,
 
     reset: function() {
         this.timer = 0;
-        this.spawnRate = 1.0;
+        this.spawnRate = 2.0; 
         Game.enemies = [];
     },
 
@@ -14,8 +14,11 @@ const EnemySpawner = {
         if (this.timer <= 0) {
             this.spawnBatch();
             this.timer = this.spawnRate;
-            // Zorluk zamanla artar
-            this.spawnRate = Math.max(0.2, 1.0 - (Game.score / 500));
+            
+            // DÜZENLEME: Zorluk artışını yavaşlattık.
+            // Eskiden 500 skorda en zor seviyeye geliyordu, şimdi 1000 skorda gelecek.
+            // Minimum spawn süresini 0.2'den 0.4'e çektik (Ekranın dolup taşmasını engellemek için)
+            this.spawnRate = Math.max(0.4, 2.0 - (Game.score / 1000));
         }
     },
 
@@ -31,7 +34,8 @@ const EnemySpawner = {
         py = Math.max(50, Math.min(py, Game.map.height - 50));
 
         // Boss veya Normal düşman
-        if (Game.score > 0 && Game.score % 50 === 0) {
+        // DÜZENLEME: Boss çıkma sıklığını biraz azalttık (Her 50 skor yerine 100 skorda bir)
+        if (Game.score > 0 && Game.score % 100 === 0) {
              Game.enemies.push(new Enemy(px, py, 'boss'));
         } else {
              Game.enemies.push(new Enemy(px, py, 'zombie'));
@@ -50,17 +54,17 @@ class Enemy {
 
         if (type === 'boss') {
             this.radius = 40;
-            this.speed = 80;
-            this.hp = 500 * (1 + Game.gameLevel * 0.5);
+            this.speed = 60; // DÜZENLEME: Hız 80'den 60'a düştü
+            this.hp = 400 * (1 + Game.gameLevel * 0.5); // Can 500'den 400'e düştü
             this.color = '#ff0000';
-            this.damage = 25;
+            this.damage = 15; // DÜZENLEME: Hasar 25'ten 15'e düştü (Tek atmasın)
             this.xpValue = 100;
         } else {
             this.radius = 15;
-            this.speed = 120 + Math.random() * 40;
-            this.hp = 30 * (1 + Game.gameLevel * 0.2);
+            this.speed = 90 + Math.random() * 30; // DÜZENLEME: Hız 120'den 90'a düştü
+            this.hp = 20 * (1 + Game.gameLevel * 0.2); // Can 30'dan 20'ye düştü
             this.color = '#ff5555';
-            this.damage = 10;
+            this.damage = 5; // DÜZENLEME: Hasar 10'dan 5'e düştü (Artık çok daha az vuruyor)
             this.xpValue = 10;
         }
     }
@@ -77,7 +81,6 @@ class Enemy {
         }
 
         // Separation (Diğer düşmanlardan uzaklaşma)
-        // Bu kod, düşmanların üst üste binmesini engeller
         Game.enemies.forEach(other => {
             if (other === this) return;
             let ox = this.x - other.x;
@@ -125,10 +128,14 @@ class Enemy {
 
     takeDamage(amount) {
         this.hp -= amount;
-        Effects.spawnBlood(this.x, this.y, '#880000');
-        Effects.showDamage(this.x, this.y - 20, amount);
         
-        // Geri tepme (Knockback)
+        // Effects nesnesinin varlığını kontrol edelim (Hata almamak için)
+        if (typeof Effects !== 'undefined') {
+            Effects.spawnBlood(this.x, this.y, '#880000');
+            Effects.showDamage(this.x, this.y - 20, amount);
+        }
+        
+        // Geri tepme (Knockback) - Vurulunca geriye savrulma
         let angle = Math.atan2(this.y - Game.player.y, this.x - Game.player.x);
         this.pushX += Math.cos(angle) * 100;
         this.pushY += Math.sin(angle) * 100;
@@ -136,8 +143,10 @@ class Enemy {
         if (this.hp <= 0) {
             this.markedForDeletion = true;
             Game.score++;
-            UI.updateScore(Game.score);
-            Effects.spawnExplosion(this.x, this.y);
+            
+            // UI ve Effects kontrolleri
+            if (typeof UI !== 'undefined') UI.updateScore(Game.score);
+            if (typeof Effects !== 'undefined') Effects.spawnExplosion(this.x, this.y);
         }
     }
 }
