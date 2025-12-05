@@ -20,17 +20,19 @@ const Game = {
     score: 0,
     gameLevel: 1,
 
+    // Input Durumları
+    keys: {},
+    mouse: { x: 0, y: 0, worldX: 0, worldY: 0, down: false },
+
     init: function() {
         this.canvas = document.getElementById('gameCanvas');
         this.ctx = this.canvas.getContext('2d');
         
-        // Canvas boyutlandırma
         this.resize();
         window.addEventListener('resize', () => this.resize());
         
-        // Sistemleri Başlat
         this.map = new GameMap(3000, 3000);
-        this.player = new Player(1500, 1500); // Harita ortası
+        this.player = new Player(1500, 1500);
         this.setupInputs();
         
         this.isRunning = true;
@@ -50,15 +52,36 @@ const Game = {
 
     setupInputs: function() {
         // Klavye
-        this.keys = {};
-        window.addEventListener('keydown', e => this.keys[e.code] = true);
+        window.addEventListener('keydown', e => {
+            this.keys[e.code] = true;
+
+            // P Tuşu - Duraklatma
+            if (e.code === 'KeyP') {
+                if (this.isPaused) this.resumeGame();
+                else this.pauseGame();
+            }
+
+            // Silah Değiştirme (1-4)
+            if (['Digit1', 'Digit2', 'Digit3', 'Digit4'].includes(e.code)) {
+                const weaponIndex = parseInt(e.key) - 1;
+                this.player.weapon.switchWeapon(weaponIndex);
+            }
+        });
+
         window.addEventListener('keyup', e => this.keys[e.code] = false);
 
-        // Mouse
-        this.mouse = { x: 0, y: 0, worldX: 0, worldY: 0 };
+        // Mouse Hareket
         window.addEventListener('mousemove', e => {
             this.mouse.x = e.clientX;
             this.mouse.y = e.clientY;
+        });
+
+        // Mouse Tıklama (Ateş)
+        window.addEventListener('mousedown', e => {
+            if(e.button === 0) this.mouse.down = true; // Sol tık
+        });
+        window.addEventListener('mouseup', e => {
+            if(e.button === 0) this.mouse.down = false;
         });
     },
 
@@ -71,35 +94,40 @@ const Game = {
         if (!this.isPaused) {
             this.update(dt);
             this.draw();
+        } else {
+            // Duraklatıldığında ekrana yazı yaz
+            this.draw();
+            this.ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+            this.ctx.fillRect(0, 0, this.width, this.height);
+            this.ctx.fillStyle = "white";
+            this.ctx.font = "50px Orbitron";
+            this.ctx.textAlign = "center";
+            this.ctx.fillText("PAUSED", this.width/2, this.height/2);
         }
         
         requestAnimationFrame((t) => this.loop(t));
     },
 
     update: function(dt) {
-        if (dt > 0.1) dt = 0.1; // Lag koruması
+        if (dt > 0.1) dt = 0.1;
 
-        // Kamera Takibi (Smooth Lerp)
-        // Kamerayı oyuncuya doğru yavaşça kaydır
+        // Kamera Takibi
         let targetCamX = this.player.x - this.width / 2;
         let targetCamY = this.player.y - this.height / 2;
         
-        // Harita sınırlarına sadık kal
         targetCamX = Math.max(0, Math.min(targetCamX, this.map.width - this.width));
         targetCamY = Math.max(0, Math.min(targetCamY, this.map.height - this.height));
 
-        // Lerp formülü: current + (target - current) * speed
         this.camera.x += (targetCamX - this.camera.x) * 5 * dt;
         this.camera.y += (targetCamY - this.camera.y) * 5 * dt;
 
-        // Mouse Dünya Koordinatı (Nişan almak için)
+        // Mouse Dünya Koordinatı
         this.mouse.worldX = this.mouse.x + this.camera.x;
         this.mouse.worldY = this.mouse.y + this.camera.y;
 
         this.player.update(dt);
         EnemySpawner.update(dt);
         
-        // Objeleri güncelle
         this.bullets.forEach((b, i) => {
             b.update(dt);
             if (b.markedForDeletion) this.bullets.splice(i, 1);
@@ -108,7 +136,6 @@ const Game = {
         this.enemies.forEach((e, i) => {
             e.update(dt);
             if (e.markedForDeletion) {
-                // Ölünce item düşür
                 if (Math.random() < 0.5) ItemFactory.createXP(e.x, e.y, 10);
                 this.enemies.splice(i, 1);
             }
@@ -124,36 +151,28 @@ const Game = {
     },
 
     draw: function() {
-        // Arkaplanı temizle
         this.ctx.fillStyle = '#111';
         this.ctx.fillRect(0, 0, this.width, this.height);
 
         this.ctx.save();
         this.ctx.translate(-this.camera.x, -this.camera.y);
 
-        // 1. Zemin
         this.map.draw(this.ctx, this.camera);
-
-        // 2. Yerdeki Itemlar (Alt katman)
         this.items.forEach(i => i.draw(this.ctx));
 
-        // 3. Karakterler ve Düşmanlar (Gölge efekti verelim)
         this.ctx.shadowColor = 'rgba(0,0,0,0.5)';
         this.ctx.shadowBlur = 10;
         
         this.enemies.forEach(e => e.draw(this.ctx));
         this.player.draw(this.ctx);
         
-        this.ctx.shadowBlur = 0; // Gölgeyi kapat
+        this.ctx.shadowBlur = 0;
 
-        // 4. Mermiler (Glow efekti ile)
-        this.ctx.globalCompositeOperation = 'lighter'; // Parlama efekti
+        this.ctx.globalCompositeOperation = 'lighter';
         this.bullets.forEach(b => b.draw(this.ctx));
-        this.ctx.globalCompositeOperation = 'source-over'; // Normale dön
+        this.ctx.globalCompositeOperation = 'source-over';
 
-        // 5. Efektler (Patlamalar, yazılar)
         Effects.draw(this.ctx);
-
         this.ctx.restore();
     },
     
@@ -163,39 +182,34 @@ const Game = {
     
     resumeGame: function() {
         this.isPaused = false;
-        this.lastTime = performance.now(); // Zamanı düzelt
+        this.lastTime = performance.now();
     }
 };
 
 const CollisionManager = {
     check: function() {
-        // Mermi vs Düşman
         Game.bullets.forEach(bullet => {
             Game.enemies.forEach(enemy => {
                 if (this.isColliding(bullet, enemy)) {
                     enemy.takeDamage(bullet.damage);
-                    bullet.markedForDeletion = true;
-                    // Vuruş efekti
+                    bullet.pierce--; // Delme özelliği
+                    if (bullet.pierce <= 0) bullet.markedForDeletion = true;
                     Effects.spawnHitEffect(bullet.x, bullet.y);
                 }
             });
         });
 
-        // Düşman vs Oyuncu
         Game.enemies.forEach(enemy => {
             if (this.dist(enemy.x, enemy.y, Game.player.x, Game.player.y) < (enemy.radius + Game.player.radius)) {
                 Game.player.takeDamage(enemy.damage);
             }
         });
 
-        // Item vs Oyuncu
         Game.items.forEach(item => {
             let d = this.dist(item.x, item.y, Game.player.x, Game.player.y);
-            // Magnet menziline girdi mi?
             if (d < Game.player.magnetRange) {
                 item.isMagnetized = true;
             }
-            // Toplandı mı?
             if (d < Game.player.radius + item.radius) {
                 item.collect();
             }

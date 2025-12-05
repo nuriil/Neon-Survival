@@ -1,74 +1,138 @@
+// Silah Konfigürasyonları
+const WEAPONS = [
+    {
+        name: 'PISTOL',
+        fireRate: 0.4,       // Saniyede ateş hızı
+        damage: 25,
+        speed: 800,
+        count: 1,            // Mermi sayısı
+        spread: 0.05,        // Dağılma açısı (radyan)
+        color: '#ffff00',
+        pierce: 1            // Kaç düşmanı deler
+    },
+    {
+        name: 'MACHINE GUN',
+        fireRate: 0.1,       // Çok hızlı
+        damage: 12,
+        speed: 900,
+        count: 1,
+        spread: 0.15,        // Biraz dağılır
+        color: '#00ff00',
+        pierce: 1
+    },
+    {
+        name: 'SHOTGUN',
+        fireRate: 1.0,       // Yavaş
+        damage: 18,
+        speed: 700,
+        count: 6,            // 6 mermi atar
+        spread: 0.5,         // Geniş dağılım
+        color: '#ffaa00',
+        pierce: 2            // 2 kişiyi deler
+    },
+    {
+        name: 'SNIPER',
+        fireRate: 1.5,       // Çok yavaş
+        damage: 150,         // Çok yüksek hasar
+        speed: 1500,         // Çok hızlı mermi
+        count: 1,
+        spread: 0.0,         // Sıfır hata payı
+        color: '#00d2ff',
+        pierce: 10           // Her şeyi deler geçer
+    }
+];
+
 class WeaponController {
     constructor(owner) {
         this.owner = owner;
-        this.fireRate = 0.2; // Saniyede ateşleme hızı
         this.timer = 0;
-        this.damage = 20;
-        this.bulletSpeed = 800;
-        this.bulletCount = 1; // Multishot için
+        this.currentWeaponIndex = 0; // Pistol ile başla
+        this.activeWeapon = WEAPONS[this.currentWeaponIndex];
+        
+        // Upgrade çarpanları
+        this.modifiers = {
+            damage: 1.0,
+            fireRate: 1.0,
+            count: 0
+        };
+    }
+
+    switchWeapon(index) {
+        if (index >= 0 && index < WEAPONS.length) {
+            this.currentWeaponIndex = index;
+            this.activeWeapon = WEAPONS[index];
+            this.timer = 0.5; // Değiştirince hemen ateş edemesin (küçük bir gecikme)
+            
+            // UI Güncelle
+            const uiName = document.getElementById('weapon-name');
+            if(uiName) uiName.innerText = this.activeWeapon.name;
+        }
     }
 
     update(dt) {
         this.timer -= dt;
-        // Otomatik ateş veya tıklama ile ateş
-        // Mobil uyumu için otomatik ateş en iyisidir
-        if (this.timer <= 0 && Game.enemies.length > 0) {
-            // En yakın düşmanı bul
-            let nearest = this.getNearestEnemy();
-            if (nearest) {
-                this.shoot(nearest);
-                this.timer = this.fireRate;
-            }
+
+        // Mouse Basılı mı?
+        if (Game.mouse.down && this.timer <= 0) {
+            this.shoot();
+            // Ateş hızı hesaplama (Upgrade çarpanları dahil)
+            this.timer = this.activeWeapon.fireRate * this.modifiers.fireRate;
         }
     }
 
-    getNearestEnemy() {
-        let nearest = null;
-        let minDist = Infinity;
-        Game.enemies.forEach(e => {
-            let d = (e.x - this.owner.x)**2 + (e.y - this.owner.y)**2;
-            if (d < minDist) {
-                minDist = d;
-                nearest = e;
-            }
-        });
-        // Sadece ekrandakilere veya 600px yakındakilere ateş et
-        if (minDist < 600**2) return nearest;
-        return null;
-    }
-
-    shoot(target) {
-        // Hedefe açı hesapla
-        let angle = Math.atan2(target.y - this.owner.y, target.x - this.owner.x);
+    shoot() {
+        // Hedef: Mouse'un Dünya Koordinatları
+        // atan2(y2-y1, x2-x1)
+        let targetAngle = Math.atan2(
+            Game.mouse.worldY - this.owner.y, 
+            Game.mouse.worldX - this.owner.x
+        );
         
-        // Çoklu mermi (Multishot)
-        for(let i=0; i<this.bulletCount; i++) {
-            // Hafif yayılma (spread) ekle
-            let spread = (i - (this.bulletCount-1)/2) * 0.1; 
+        let bulletCount = this.activeWeapon.count + this.modifiers.count;
+
+        for(let i=0; i<bulletCount; i++) {
+            // Spread (Dağılma) Hesabı
+            // Eğer tek mermi ise spread'i rastgele sağa sola ver
+            // Çoklu mermiyse yelpaze şeklinde aç
+            let spreadOffset;
+            
+            if (bulletCount === 1) {
+                spreadOffset = (Math.random() - 0.5) * this.activeWeapon.spread;
+            } else {
+                // Shotgun mantığı: Yelpaze
+                spreadOffset = (i - (bulletCount-1)/2) * (this.activeWeapon.spread / bulletCount);
+                // Hafif rastgelelik de ekle
+                spreadOffset += (Math.random() - 0.5) * 0.05;
+            }
+
+            let finalAngle = targetAngle + spreadOffset;
+
             Game.bullets.push(new Bullet(
                 this.owner.x, 
                 this.owner.y, 
-                angle + spread, 
-                this.bulletSpeed, 
-                this.damage
+                finalAngle, 
+                this.activeWeapon.speed, 
+                this.activeWeapon.damage * this.modifiers.damage,
+                this.activeWeapon.color,
+                this.activeWeapon.pierce
             ));
         }
-        
-        // Ateş sesi efekti (Buraya eklenebilir)
     }
 }
 
 class Bullet {
-    constructor(x, y, angle, speed, damage) {
+    constructor(x, y, angle, speed, damage, color, pierce) {
         this.x = x;
         this.y = y;
         this.vx = Math.cos(angle) * speed;
         this.vy = Math.sin(angle) * speed;
         this.damage = damage;
+        this.color = color;
+        this.pierce = pierce || 1; // Kaç düşmanı delip geçebilir
+        
         this.radius = 6;
         this.markedForDeletion = false;
-        this.life = 2.0; // 2 saniye sonra yok olur
-        this.color = '#ffff00';
+        this.life = 1.5; // Ömür
     }
 
     update(dt) {
@@ -92,9 +156,9 @@ class Bullet {
         // Kuyruk efekti
         ctx.beginPath();
         ctx.moveTo(this.x, this.y);
-        ctx.lineTo(this.x - this.vx * 0.05, this.y - this.vy * 0.05);
-        ctx.strokeStyle = 'rgba(255, 255, 0, 0.5)';
-        ctx.lineWidth = 4;
+        ctx.lineTo(this.x - this.vx * 0.04, this.y - this.vy * 0.04);
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = 2;
         ctx.stroke();
     }
 }

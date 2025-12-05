@@ -26,18 +26,16 @@ class Player {
         if (Game.keys['KeyA'] || Game.keys['ArrowLeft']) dx = -1;
         if (Game.keys['KeyD'] || Game.keys['ArrowRight']) dx = 1;
 
-        // Normalize vector (çapraz daha hızlı gitmesin)
+        // Normalize vector
         if (dx !== 0 || dy !== 0) {
             let len = Math.sqrt(dx*dx + dy*dy);
             dx /= len;
             dy /= len;
         }
 
-        // Gelecekteki pozisyon
         let nextX = this.x + dx * this.speed * dt;
         let nextY = this.y + dy * this.speed * dt;
 
-        // Harita Sınırları
         this.x = Math.max(this.radius, Math.min(nextX, Game.map.width - this.radius));
         this.y = Math.max(this.radius, Math.min(nextY, Game.map.height - this.radius));
 
@@ -49,31 +47,31 @@ class Player {
     }
 
     draw(ctx) {
-        // Karakter Gövdesi (Modern Neon Tarzı)
+        // Karakter Gövdesi
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-        ctx.fillStyle = '#00d2ff'; // Cyan
+        ctx.fillStyle = '#00d2ff'; 
         ctx.fill();
         ctx.strokeStyle = '#fff';
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // Glow (Hale)
         ctx.shadowColor = '#00d2ff';
         ctx.shadowBlur = 15;
 
-        // Silah Yönü
+        // Silah Yönü - Fareye Baksın
         let angle = Math.atan2(Game.mouse.worldY - this.y, Game.mouse.worldX - this.x);
         
         ctx.save();
         ctx.translate(this.x, this.y);
         ctx.rotate(angle);
         
-        // Silah Çizimi (Dikdörtgen)
+        // Silah Çizimi
         ctx.fillStyle = '#333';
-        ctx.fillRect(10, -5, 20, 10); // Namlu
-        ctx.fillStyle = '#555';
-        ctx.fillRect(0, -5, 10, 10);
+        // Silah tipine göre uzunluk değişebilir ama şimdilik standart
+        ctx.fillRect(10, -5, 25, 10); // Namlu
+        ctx.fillStyle = '#777';
+        ctx.fillRect(0, -5, 10, 10); // Kabza
         
         ctx.restore();
         ctx.shadowBlur = 0;
@@ -81,7 +79,7 @@ class Player {
 
     takeDamage(amount) {
         this.hp -= amount;
-        Effects.spawnBlood(this.x, this.y, '#00d2ff'); // Robot kanı gibi mavi kıvılcım
+        Effects.spawnBlood(this.x, this.y, '#00d2ff');
         if (this.hp <= 0) {
             UI.showGameOver();
             Game.isRunning = false;
