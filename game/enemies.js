@@ -1,11 +1,11 @@
 const EnemySpawner = {
     timer: 0,
-    spawnRate: 1.0, // BAŞLANGIÇ: 1.0 yerine 2.0 saniye yaptık (Daha yavaş başlasın)
+    spawnRate: 1.0, 
     difficultyMultiplier: 1.0,
 
     reset: function() {
         this.timer = 0;
-        this.spawnRate = 2.0; 
+        this.spawnRate = 1.0;
         Game.enemies = [];
     },
 
@@ -14,28 +14,32 @@ const EnemySpawner = {
         if (this.timer <= 0) {
             this.spawnBatch();
             this.timer = this.spawnRate;
-            
-            // DÜZENLEME: Zorluk artışını yavaşlattık.
-            // Eskiden 500 skorda en zor seviyeye geliyordu, şimdi 1000 skorda gelecek.
-            // Minimum spawn süresini 0.2'den 0.4'e çektik (Ekranın dolup taşmasını engellemek için)
-            this.spawnRate = Math.max(0.4, 2.0 - (Game.score / 1000));
+            this.spawnRate = Math.max(0.2, 1.0 - (Game.score / 500));
         }
     },
 
     spawnBatch: function() {
-        // Oyuncudan uzakta bir nokta seç (Kamera dışı)
-        let angle = Math.random() * Math.PI * 2;
-        let dist = 600; // Ekranın biraz dışı
-        let px = Game.player.x + Math.cos(angle) * dist;
-        let py = Game.player.y + Math.sin(angle) * dist;
+        // Güvenli alanın DIŞINDA spawn olmalı
+        let validPos = false;
+        let px, py;
+        let safeDist = Game.shop.safeZoneRadius + 200;
 
-        // Harita sınırlarını kontrol et
-        px = Math.max(50, Math.min(px, Game.map.width - 50));
-        py = Math.max(50, Math.min(py, Game.map.height - 50));
+        while(!validPos) {
+            let angle = Math.random() * Math.PI * 2;
+            let dist = 700; 
+            px = Game.player.x + Math.cos(angle) * dist;
+            py = Game.player.y + Math.sin(angle) * dist;
+            
+            // Harita sınırları
+            px = Math.max(50, Math.min(px, Game.map.width - 50));
+            py = Math.max(50, Math.min(py, Game.map.height - 50));
 
-        // Boss veya Normal düşman
-        // DÜZENLEME: Boss çıkma sıklığını biraz azalttık (Her 50 skor yerine 100 skorda bir)
-        if (Game.score > 0 && Game.score % 100 === 0) {
+            // Marketten yeterince uzak mı?
+            let distShop = Math.sqrt((px - Game.shop.x)**2 + (py - Game.shop.y)**2);
+            if (distShop > safeDist) validPos = true;
+        }
+
+        if (Game.score > 0 && Game.score % 50 === 0) {
              Game.enemies.push(new Enemy(px, py, 'boss'));
         } else {
              Game.enemies.push(new Enemy(px, py, 'zombie'));
@@ -54,24 +58,33 @@ class Enemy {
 
         if (type === 'boss') {
             this.radius = 40;
-            this.speed = 60; // DÜZENLEME: Hız 80'den 60'a düştü
-            this.hp = 450 * (1 + Game.gameLevel * 0.5); // Can 500'den 400'e düştü
+            this.speed = 80;
+            this.hp = 800 * (1 + Game.gameLevel * 0.5); // Boss güçlendi
             this.color = '#ff0000';
-            // GÜNCELLEME: Hasar 15'ten 5'e indirildi (Çok az hasar)
-            this.damage = 5; 
+            this.damage = 25;
             this.xpValue = 100;
         } else {
             this.radius = 15;
-            this.speed = 90 + Math.random() * 30; // DÜZENLEME: Hız 120'den 90'a düştü
-            this.hp = 40 * (1 + Game.gameLevel * 0.2); // Can 30'dan 20'ye düştü
+            this.speed = 110 + Math.random() * 30; // Biraz yavaşladı
+            // DENGELEME: Pistol 25 vuruyor, 3 vuruş = 75 HP
+            this.hp = 75 * (1 + Game.gameLevel * 0.1); 
             this.color = '#ff5555';
-            // GÜNCELLEME: Hasar 5'ten 1'e indirildi (Minimum hasar)
-            this.damage = 1; 
+            this.damage = 10;
             this.xpValue = 10;
         }
     }
 
     update(dt) {
+        // Safe Zone Kontrolü (Geri itme)
+        let distToShop = Math.sqrt((this.x - Game.shop.x)**2 + (this.y - Game.shop.y)**2);
+        if (distToShop < Game.shop.safeZoneRadius) {
+            // Marketten dışarı doğru it
+            let angle = Math.atan2(this.y - Game.shop.y, this.x - Game.shop.x);
+            this.x += Math.cos(angle) * 200 * dt;
+            this.y += Math.sin(angle) * 200 * dt;
+            return; // Oyuncuya ilerleme iptal
+        }
+
         // Oyuncuya yönel
         let dx = Game.player.x - this.x;
         let dy = Game.player.y - this.y;
@@ -82,7 +95,7 @@ class Enemy {
             dy /= dist;
         }
 
-        // Separation (Diğer düşmanlardan uzaklaşma)
+        // Separation 
         Game.enemies.forEach(other => {
             if (other === this) return;
             let ox = this.x - other.x;
@@ -95,7 +108,6 @@ class Enemy {
             }
         });
 
-        // Sürtünme (İtme kuvvetini azalt)
         this.pushX *= 0.9;
         this.pushY *= 0.9;
 
@@ -105,7 +117,6 @@ class Enemy {
 
     draw(ctx) {
         ctx.beginPath();
-        // Düşman şekli (Hafif titreyen bir daire - zombi efekti)
         let wobble = Math.sin(Date.now() / 100) * 2;
         
         if (this.type === 'boss') {
@@ -120,7 +131,6 @@ class Enemy {
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // Gözler
         ctx.fillStyle = 'yellow';
         ctx.beginPath();
         ctx.arc(this.x - 5, this.y - 5, 3, 0, Math.PI*2);
@@ -130,14 +140,9 @@ class Enemy {
 
     takeDamage(amount) {
         this.hp -= amount;
+        Effects.spawnBlood(this.x, this.y, '#880000');
+        Effects.showDamage(this.x, this.y - 20, amount);
         
-        // Effects nesnesinin varlığını kontrol edelim (Hata almamak için)
-        if (typeof Effects !== 'undefined') {
-            Effects.spawnBlood(this.x, this.y, '#880000');
-            Effects.showDamage(this.x, this.y - 20, amount);
-        }
-        
-        // Geri tepme (Knockback) - Vurulunca geriye savrulma
         let angle = Math.atan2(this.y - Game.player.y, this.x - Game.player.x);
         this.pushX += Math.cos(angle) * 100;
         this.pushY += Math.sin(angle) * 100;
@@ -145,13 +150,8 @@ class Enemy {
         if (this.hp <= 0) {
             this.markedForDeletion = true;
             Game.score++;
-            
-            // UI ve Effects kontrolleri
-            if (typeof UI !== 'undefined') UI.updateScore(Game.score);
-            if (typeof Effects !== 'undefined') Effects.spawnExplosion(this.x, this.y);
+            UI.updateScore(Game.score);
+            Effects.spawnExplosion(this.x, this.y);
         }
     }
 }
-
-
-
