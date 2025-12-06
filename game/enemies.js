@@ -1,6 +1,6 @@
 const EnemySpawner = {
     timer: 0,
-    spawnRate: 2.0, // BAŞLANGIÇ: 1.0 yerine 2.0 saniye yaptık (Daha yavaş başlasın)
+    spawnRate: 1.0, // BAŞLANGIÇ: 1.0 yerine 2.0 saniye yaptık (Daha yavaş başlasın)
     difficultyMultiplier: 1.0,
 
     reset: function() {
@@ -152,3 +152,4 @@ class Enemy {
         }
     }
 }
+
