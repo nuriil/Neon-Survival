@@ -69,7 +69,7 @@ class Enemy {
             // DENGELEME: Pistol 25 vuruyor, 3 vuruş = 75 HP
             this.hp = 75 * (1 + Game.gameLevel * 0.1); 
             this.color = '#ff5555';
-            this.damage = 10;
+            this.damage = 4;
             this.xpValue = 10;
         }
     }
@@ -155,3 +155,4 @@ class Enemy {
         }
     }
 }
+
