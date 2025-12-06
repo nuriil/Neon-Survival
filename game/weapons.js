@@ -2,8 +2,9 @@
 const WEAPONS = [
     {
         name: 'PISTOL',
+        price: 0,            // BAŞLANGIÇ SİLAHI (Ücretsiz)
         fireRate: 0.4,       
-        damage: 25,          // 75 HP Zombi -> 3 vuruş
+        damage: 25,          
         speed: 800,
         count: 1,            
         spread: 0.05,        
@@ -12,8 +13,9 @@ const WEAPONS = [
     },
     {
         name: 'MACHINE GUN',
-        fireRate: 0.12,      // Biraz yavaşlattık denge için
-        damage: 15,          // 75 HP -> 5 vuruş (Seri atıyor)
+        price: 1500,         // FİYAT EKLENDİ
+        fireRate: 0.12,      
+        damage: 15,          
         speed: 900,
         count: 1,
         spread: 0.15,        
@@ -22,8 +24,9 @@ const WEAPONS = [
     },
     {
         name: 'SHOTGUN',
+        price: 3000,         // FİYAT EKLENDİ
         fireRate: 1.0,       
-        damage: 15,          // Pellet başına 15. 6 pellet = 90 dmg (Tek atar yakından)
+        damage: 15,          
         speed: 700,
         count: 6,            
         spread: 0.5,         
@@ -32,8 +35,9 @@ const WEAPONS = [
     },
     {
         name: 'SNIPER',
+        price: 6000,         // FİYAT EKLENDİ
         fireRate: 1.5,       
-        damage: 200,         // Kesin tek atar
+        damage: 200,         
         speed: 1500,         
         count: 1,
         spread: 0.0,         
@@ -47,12 +51,25 @@ class WeaponController {
         this.owner = owner;
         this.timer = 0;
         this.currentWeaponIndex = 0; 
-        this.activeWeapon = WEAPONS[this.currentWeaponIndex];
+        
+        // Başlangıçta eğer owner.ownedWeapons varsa ve boş değilse ilkini al, yoksa 0'ı al
+        let initialIndex = (owner.ownedWeapons && owner.ownedWeapons.length > 0) ? owner.ownedWeapons[0] : 0;
+        
+        // Eğer WEAPONS boşsa hata vermesin diye kontrol
+        if (WEAPONS && WEAPONS.length > 0) {
+             this.currentWeaponIndex = initialIndex;
+             this.activeWeapon = WEAPONS[this.currentWeaponIndex];
+        } else {
+             // Fallback dummy weapon
+             this.activeWeapon = { name: 'ERROR', fireRate: 1, damage: 10, speed: 500, count: 1, spread: 0, color: '#fff', pierce: 1 };
+        }
         
         this.modifiers = {
             damage: 1.0,
             fireRate: 1.0,
-            count: 0
+            count: 0,
+            speed: 1.0,
+            pierce: 0
         };
     }
 
@@ -70,7 +87,6 @@ class WeaponController {
     update(dt) {
         this.timer -= dt;
         
-        // Market açıkken ateş edemesin
         if (Game.isShopOpen) return;
 
         if (Game.mouse.down && this.timer <= 0) {
@@ -80,6 +96,8 @@ class WeaponController {
     }
 
     shoot() {
+        if(!this.activeWeapon) return;
+
         let targetAngle = Math.atan2(
             Game.mouse.worldY - this.owner.y, 
             Game.mouse.worldX - this.owner.x
@@ -98,15 +116,17 @@ class WeaponController {
             }
 
             let finalAngle = targetAngle + spreadOffset;
+            let finalSpeed = this.activeWeapon.speed * (this.modifiers.speed || 1);
+            let finalPierce = (this.activeWeapon.pierce || 1) + (this.modifiers.pierce || 0);
 
             Game.bullets.push(new Bullet(
                 this.owner.x, 
                 this.owner.y, 
                 finalAngle, 
-                this.activeWeapon.speed, 
+                finalSpeed, 
                 this.activeWeapon.damage * this.modifiers.damage,
                 this.activeWeapon.color,
-                this.activeWeapon.pierce
+                finalPierce
             ));
         }
     }
@@ -120,11 +140,11 @@ class Bullet {
         this.vy = Math.sin(angle) * speed;
         this.damage = damage;
         this.color = color;
-        this.pierce = pierce || 1; 
+        this.pierce = pierce; 
         
         this.radius = 6;
         this.markedForDeletion = false;
-        this.life = 1.5; 
+        this.life = 2.0; 
     }
 
     update(dt) {
@@ -147,9 +167,10 @@ class Bullet {
         
         ctx.beginPath();
         ctx.moveTo(this.x, this.y);
-        ctx.lineTo(this.x - this.vx * 0.04, this.y - this.vy * 0.04);
+        ctx.lineTo(this.x - this.vx * 0.05, this.y - this.vy * 0.05);
         ctx.strokeStyle = this.color;
         ctx.lineWidth = 2;
         ctx.stroke();
     }
 }
+
