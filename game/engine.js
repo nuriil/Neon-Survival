@@ -6,6 +6,7 @@ const Game = {
     lastTime: 0,
     isRunning: false,
     isPaused: false,
+    isShopOpen: false,
     
     // Oyun Sistemleri
     player: null,
@@ -20,6 +21,15 @@ const Game = {
     score: 0,
     gameLevel: 1,
 
+    // Market Verisi
+    shop: {
+        x: 1500,
+        y: 1500,
+        radius: 100, // Bina boyutu
+        safeZoneRadius: 350, // Düşmanların yaklaşamadığı alan
+        active: true
+    },
+
     // Input Durumları
     keys: {},
     mouse: { x: 0, y: 0, worldX: 0, worldY: 0, down: false },
@@ -28,11 +38,15 @@ const Game = {
         this.canvas = document.getElementById('gameCanvas');
         this.ctx = this.canvas.getContext('2d');
         
+        // UI Başlat
+        UI.init();
+
         this.resize();
         window.addEventListener('resize', () => this.resize());
         
         this.map = new GameMap(3000, 3000);
-        this.player = new Player(1500, 1500);
+        // Oyuncuyu marketin yanına koyalım
+        this.player = new Player(1400, 1500); 
         this.setupInputs();
         
         this.isRunning = true;
@@ -56,9 +70,14 @@ const Game = {
             this.keys[e.code] = true;
 
             // P Tuşu - Duraklatma
-            if (e.code === 'KeyP') {
+            if (e.code === 'KeyP' && !this.isShopOpen) {
                 if (this.isPaused) this.resumeGame();
                 else this.pauseGame();
+            }
+
+            // E Tuşu - Market Etkileşimi
+            if (e.code === 'KeyE') {
+                this.checkShopInteraction();
             }
 
             // Silah Değiştirme (1-4)
@@ -78,11 +97,22 @@ const Game = {
 
         // Mouse Tıklama (Ateş)
         window.addEventListener('mousedown', e => {
-            if(e.button === 0) this.mouse.down = true; // Sol tık
+            if(e.button === 0) this.mouse.down = true; 
         });
         window.addEventListener('mouseup', e => {
             if(e.button === 0) this.mouse.down = false;
         });
+    },
+
+    checkShopInteraction: function() {
+        let dist = Math.sqrt((this.player.x - this.shop.x)**2 + (this.player.y - this.shop.y)**2);
+        if (dist < this.shop.radius + 100) {
+            if (this.isShopOpen) {
+                UI.closeShop();
+            } else {
+                UI.openShop();
+            }
+        }
     },
 
     loop: function(timestamp) {
@@ -94,8 +124,11 @@ const Game = {
         if (!this.isPaused) {
             this.update(dt);
             this.draw();
+        } else if (this.isShopOpen) {
+            // Market açıkken arkada oyun dursun ama çizilsin
+            this.draw();
         } else {
-            // Duraklatıldığında ekrana yazı yaz
+            // Duraklatma ekranı
             this.draw();
             this.ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
             this.ctx.fillRect(0, 0, this.width, this.height);
@@ -136,7 +169,12 @@ const Game = {
         this.enemies.forEach((e, i) => {
             e.update(dt);
             if (e.markedForDeletion) {
+                // %100 Coin düşme ihtimali
+                ItemFactory.createCoin(e.x, e.y, 10);
+                
+                // %50 XP düşme ihtimali
                 if (Math.random() < 0.5) ItemFactory.createXP(e.x, e.y, 10);
+                
                 this.enemies.splice(i, 1);
             }
         });
@@ -158,6 +196,10 @@ const Game = {
         this.ctx.translate(-this.camera.x, -this.camera.y);
 
         this.map.draw(this.ctx, this.camera);
+        
+        // Market Çizimi (Safe Zone)
+        this.map.drawShop(this.ctx);
+
         this.items.forEach(i => i.draw(this.ctx));
 
         this.ctx.shadowColor = 'rgba(0,0,0,0.5)';
@@ -173,6 +215,16 @@ const Game = {
         this.ctx.globalCompositeOperation = 'source-over';
 
         Effects.draw(this.ctx);
+        
+        // Market Etkileşim İpucu
+        let dist = Math.sqrt((this.player.x - this.shop.x)**2 + (this.player.y - this.shop.y)**2);
+        if (dist < this.shop.radius + 100) {
+            this.ctx.fillStyle = "white";
+            this.ctx.font = "20px Arial";
+            this.ctx.textAlign = "center";
+            this.ctx.fillText("Press 'E' to Shop", this.shop.x, this.shop.y - 120);
+        }
+
         this.ctx.restore();
     },
     
@@ -192,7 +244,7 @@ const CollisionManager = {
             Game.enemies.forEach(enemy => {
                 if (this.isColliding(bullet, enemy)) {
                     enemy.takeDamage(bullet.damage);
-                    bullet.pierce--; // Delme özelliği
+                    bullet.pierce--; 
                     if (bullet.pierce <= 0) bullet.markedForDeletion = true;
                     Effects.spawnHitEffect(bullet.x, bullet.y);
                 }
