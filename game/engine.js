@@ -77,7 +77,6 @@ const Game = {
             }
 
             // Silah Değiştirme (1-4)
-            // YENİ KURAL: Sadece sahip olunan silahlara geçiş yapılabilir.
             if (['Digit1', 'Digit2', 'Digit3', 'Digit4'].includes(e.code)) {
                 const weaponIndex = parseInt(e.key) - 1;
                 if (this.player.ownedWeapons.includes(weaponIndex)) {
@@ -167,7 +166,9 @@ const Game = {
             e.update(dt);
             if (e.markedForDeletion) {
                 // Item düşürme (XP ve Coin)
-                ItemFactory.createCoin(e.x, e.y, 10);
+                // DEĞİŞİKLİK: Coin miktarı 10'dan 30'a çıkarıldı.
+                ItemFactory.createCoin(e.x, e.y, 30);
+                
                 if (Math.random() < 0.6) ItemFactory.createXP(e.x, e.y, 15);
                 
                 this.enemies.splice(i, 1);
@@ -232,6 +233,7 @@ const Game = {
 
 const CollisionManager = {
     check: function() {
+        // 1. Mermiler vs Düşmanlar
         Game.bullets.forEach(bullet => {
             Game.enemies.forEach(enemy => {
                 if (this.isColliding(bullet, enemy)) {
@@ -241,14 +243,29 @@ const CollisionManager = {
                     Effects.spawnHitEffect(bullet.x, bullet.y);
                 }
             });
+            
+            // Mermiler vs Engeller (Ağaç/Kaya)
+            Game.map.obstacles.forEach(obs => {
+                if (this.isColliding(bullet, obs)) {
+                    bullet.markedForDeletion = true;
+                    Effects.spawnHitEffect(bullet.x, bullet.y);
+                }
+            });
         });
 
+        // 2. Düşman vs Oyuncu
         Game.enemies.forEach(enemy => {
             if (this.dist(enemy.x, enemy.y, Game.player.x, Game.player.y) < (enemy.radius + Game.player.radius)) {
                 Game.player.takeDamage(enemy.damage);
             }
+            // Düşman vs Engel (Çarpışma çözümü)
+            this.resolveMapCollision(enemy);
         });
 
+        // 3. Oyuncu vs Engel (Çarpışma çözümü)
+        this.resolveMapCollision(Game.player);
+
+        // 4. Eşyalar vs Oyuncu
         Game.items.forEach(item => {
             let d = this.dist(item.x, item.y, Game.player.x, Game.player.y);
             if (d < Game.player.magnetRange) {
@@ -256,6 +273,24 @@ const CollisionManager = {
             }
             if (d < Game.player.radius + item.radius) {
                 item.collect();
+            }
+        });
+    },
+
+    // Yeni: Harita objelerine çarpınca itme
+    resolveMapCollision: function(entity) {
+        Game.map.obstacles.forEach(obs => {
+            let dx = entity.x - obs.x;
+            let dy = entity.y - obs.y;
+            let dist = Math.sqrt(dx*dx + dy*dy);
+            let minDist = entity.radius + obs.radius;
+
+            if (dist < minDist) {
+                // İç içe geçmişler, dışarı it
+                let angle = Math.atan2(dy, dx);
+                let pushForce = minDist - dist;
+                entity.x += Math.cos(angle) * pushForce;
+                entity.y += Math.sin(angle) * pushForce;
             }
         });
     },
