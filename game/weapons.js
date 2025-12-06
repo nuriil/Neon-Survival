@@ -3,7 +3,7 @@ const WEAPONS = [
     {
         name: 'PISTOL',
         fireRate: 0.4,       // Saniyede ateş hızı
-        damage: 25,
+        damage: 15,
         speed: 800,
         count: 1,            // Mermi sayısı
         spread: 0.05,        // Dağılma açısı (radyan)
@@ -22,17 +22,17 @@ const WEAPONS = [
     },
     {
         name: 'SHOTGUN',
-        fireRate: 1.0,       // Yavaş
-        damage: 18,
+        fireRate: 2.0,       // Yavaş
+        damage: 14,
         speed: 700,
-        count: 6,            // 6 mermi atar
+        count: 4,            // 6 mermi atar
         spread: 0.5,         // Geniş dağılım
         color: '#ffaa00',
         pierce: 2            // 2 kişiyi deler
     },
     {
         name: 'SNIPER',
-        fireRate: 1.5,       // Çok yavaş
+        fireRate: 2.2,       // Çok yavaş
         damage: 150,         // Çok yüksek hasar
         speed: 1500,         // Çok hızlı mermi
         count: 1,
@@ -161,4 +161,5 @@ class Bullet {
         ctx.lineWidth = 2;
         ctx.stroke();
     }
+
 }
