@@ -1,4 +1,3 @@
-// Market Ürün Listesi
 const SKINS_DB = [
     { id: 'default', name: 'Klasik Mavi', price: 0, color: '#00d2ff', shape: 'circle' },
     { id: 'red_sq', name: 'Kızıl Kare', price: 1000, color: '#ff0000', shape: 'square' },
@@ -18,26 +17,25 @@ const UI = {
     gameOverScreen: document.getElementById('game-over-screen'),
     finalScore: document.getElementById('final-score'),
     
-    // Yeni Elementler için placeholder
     shopModal: null,
     coinDisplay: null,
 
     init: function() {
-        // Coin göstergesini oluştur
         this.createCoinDisplay();
-        // Shop Modalını oluştur
         this.createShopModal();
     },
 
     createCoinDisplay: function() {
+        // Z-Index artırıldı
         let div = document.createElement('div');
-        div.style.position = 'absolute';
+        div.style.position = 'fixed'; // Absolute yerine fixed daha garantidir
         div.style.top = '60px';
         div.style.left = '20px';
         div.style.fontSize = '24px';
         div.style.color = '#FFD700';
         div.style.fontFamily = 'Orbitron, sans-serif';
         div.style.textShadow = '0 0 5px black';
+        div.style.zIndex = '1000'; 
         div.innerHTML = `💰 <span id="coin-count">0</span>`;
         document.body.appendChild(div);
         this.coinDisplay = document.getElementById('coin-count');
@@ -46,27 +44,28 @@ const UI = {
     createShopModal: function() {
         let modal = document.createElement('div');
         modal.id = 'shop-modal';
-        modal.className = 'hidden'; // CSS'de .hidden { display: none } var kabul ediyoruz
-        // Inline stil verelim garanti olsun
+        
+        // Z-Index en üste çekildi (99999)
         modal.style.display = 'none';
         modal.style.position = 'fixed';
         modal.style.top = '50%';
         modal.style.left = '50%';
         modal.style.transform = 'translate(-50%, -50%)';
-        modal.style.background = 'rgba(20, 20, 30, 0.95)';
+        modal.style.background = 'rgba(20, 20, 30, 0.98)';
         modal.style.padding = '30px';
         modal.style.borderRadius = '15px';
         modal.style.border = '2px solid #FFD700';
         modal.style.width = '800px';
-        modal.style.maxHeight = '80%';
+        modal.style.maxHeight = '80vh';
         modal.style.overflowY = 'auto';
         modal.style.color = 'white';
         modal.style.fontFamily = 'Orbitron, sans-serif';
-        modal.style.zIndex = '1000';
+        modal.style.zIndex = '99999'; // EN ÖNEMLİ KISIM
+        modal.style.boxShadow = '0 0 50px rgba(0,0,0,0.8)';
 
         let header = document.createElement('div');
         header.innerHTML = '<h2 style="text-align:center; color:#FFD700; margin-bottom:20px;">MARKET</h2>';
-        header.innerHTML += '<div style="text-align:center; margin-bottom:20px;">Paranız: <span id="shop-money">0</span> 💰</div>';
+        header.innerHTML += '<div style="text-align:center; margin-bottom:20px; font-size: 20px;">Bakiyeniz: <span id="shop-money" style="color:#FFD700">0</span> 💰</div>';
         
         let grid = document.createElement('div');
         grid.id = 'shop-grid';
@@ -78,37 +77,64 @@ const UI = {
         closeBtn.innerText = 'KAPAT (E)';
         closeBtn.style.marginTop = '20px';
         closeBtn.style.width = '100%';
-        closeBtn.style.padding = '10px';
+        closeBtn.style.padding = '15px';
+        closeBtn.style.fontSize = '18px';
+        closeBtn.style.fontWeight = 'bold';
         closeBtn.style.background = '#333';
         closeBtn.style.color = 'white';
-        closeBtn.style.border = 'none';
+        closeBtn.style.border = '2px solid #555';
         closeBtn.style.cursor = 'pointer';
         closeBtn.onclick = () => this.closeShop();
 
         modal.appendChild(header);
         modal.appendChild(grid);
         modal.appendChild(closeBtn);
-        document.body.appendChild(modal);
+        
+        // Eğer body hazır değilse hata vermemesi için kontrol
+        if(document.body) {
+            document.body.appendChild(modal);
+        } else {
+            console.error("HATA: document.body hazır değil! Script etiketlerini </body> öncesine koyun.");
+            window.addEventListener('load', () => document.body.appendChild(modal));
+        }
         
         this.shopModal = modal;
     },
 
     openShop: function() {
+        if (!this.shopModal) return;
+        
+        console.log("Market açılıyor..."); // F12 Konsolda bunu görmelisiniz
         Game.isShopOpen = true;
         Game.pauseGame();
-        this.shopModal.style.display = 'block';
+        
+        // CSS class çakışmasını önlemek için inline stil basıyoruz
+        this.shopModal.style.display = 'block'; 
+        this.shopModal.classList.remove('hidden'); // Varsa hidden classını sil
+        
         this.refreshShopItems();
     },
 
     closeShop: function() {
         Game.isShopOpen = false;
         Game.resumeGame();
-        this.shopModal.style.display = 'none';
+        if (this.shopModal) {
+            this.shopModal.style.display = 'none';
+        }
     },
 
     refreshShopItems: function() {
-        document.getElementById('shop-money').innerText = Game.player.coins;
+        // Güvenlik kontrolü: Player veya coins yoksa varsayılan kullan
+        let coins = Game.player ? Game.player.coins : 0;
+        let currentSkinId = (Game.player && Game.player.currentSkin) ? Game.player.currentSkin.id : 'default';
+        let ownedSkins = (Game.player && Game.player.ownedSkins) ? Game.player.ownedSkins : ['default'];
+
+        let shopMoney = document.getElementById('shop-money');
+        if(shopMoney) shopMoney.innerText = coins;
+        
         const grid = document.getElementById('shop-grid');
+        if(!grid) return;
+        
         grid.innerHTML = '';
 
         SKINS_DB.forEach(skin => {
@@ -117,22 +143,23 @@ const UI = {
             itemDiv.style.padding = '15px';
             itemDiv.style.borderRadius = '10px';
             itemDiv.style.textAlign = 'center';
-            itemDiv.style.border = Game.player.currentSkin.id === skin.id ? '2px solid #00ff00' : '1px solid #444';
+            itemDiv.style.border = currentSkinId === skin.id ? '2px solid #00ff00' : '1px solid #444';
 
-            // Önizleme
-            let shape = skin.shape === 'square' ? 'border-radius:0;' : 'border-radius:50%;';
-            let preview = `<div style="width:40px; height:40px; background:${skin.color}; margin:0 auto 10px; ${shape}"></div>`;
-            
+            let shapeStyle = skin.shape === 'square' ? 'border-radius:0;' : 'border-radius:50%;';
+            let preview = `<div style="width:40px; height:40px; background:${skin.color}; margin:0 auto 10px; ${shapeStyle}"></div>`;
             let name = `<div style="font-weight:bold; margin-bottom:5px;">${skin.name}</div>`;
-            let price = `<div style="color:#FFD700; margin-bottom:10px;">${skin.price > 0 ? skin.price + ' 💰' : 'Bedava'}</div>`;
+            let priceText = skin.price > 0 ? skin.price + ' 💰' : 'Bedava';
+            let price = `<div style="color:#FFD700; margin-bottom:10px;">${priceText}</div>`;
             
             let btn = document.createElement('button');
-            btn.style.padding = '5px 15px';
+            btn.style.padding = '8px 20px';
             btn.style.cursor = 'pointer';
+            btn.style.border = 'none';
+            btn.style.borderRadius = '5px';
+            btn.style.fontWeight = 'bold';
             
-            // Buton Mantığı
-            if (Game.player.ownedSkins.includes(skin.id)) {
-                if (Game.player.currentSkin.id === skin.id) {
+            if (ownedSkins.includes(skin.id)) {
+                if (currentSkinId === skin.id) {
                     btn.innerText = 'GİYİLDİ';
                     btn.disabled = true;
                     btn.style.background = '#00ff00';
@@ -140,21 +167,26 @@ const UI = {
                 } else {
                     btn.innerText = 'GİY';
                     btn.style.background = '#00d2ff';
+                    btn.style.color = '#fff';
                     btn.onclick = () => {
-                        Game.player.setSkin(skin);
+                        if(Game.player) Game.player.setSkin(skin);
                         this.refreshShopItems();
                     };
                 }
             } else {
                 btn.innerText = 'SATIN AL';
                 btn.style.background = '#e63946';
-                if (Game.player.coins >= skin.price) {
+                btn.style.color = '#fff';
+                
+                if (coins >= skin.price) {
                     btn.onclick = () => {
-                        Game.player.coins -= skin.price;
-                        Game.player.ownedSkins.push(skin.id);
-                        this.updateCoins(Game.player.coins);
-                        Effects.showDamage(Game.player.x, Game.player.y, "Satın Alındı!", "#00ff00");
-                        this.refreshShopItems();
+                        if(Game.player) {
+                            Game.player.coins -= skin.price;
+                            Game.player.ownedSkins.push(skin.id);
+                            this.updateCoins(Game.player.coins);
+                            Effects.showDamage(Game.player.x, Game.player.y, "Satın Alındı!", "#00ff00");
+                            this.refreshShopItems();
+                        }
                     };
                 } else {
                     btn.disabled = true;
@@ -171,34 +203,33 @@ const UI = {
 
     updateCoins: function(amount) {
         if(this.coinDisplay) this.coinDisplay.innerText = amount;
-        // Market açıksa oradaki parayı da güncelle
         let shopMoney = document.getElementById('shop-money');
         if(shopMoney) shopMoney.innerText = amount;
     },
 
     updateHp: function(current, max) {
         let pct = Math.max(0, (current / max) * 100);
-        this.hpBar.style.width = pct + '%';
-        this.hpText.innerText = Math.ceil(current) + '/' + max;
+        if(this.hpBar) this.hpBar.style.width = pct + '%';
+        if(this.hpText) this.hpText.innerText = Math.ceil(current) + '/' + max;
     },
 
     updateScore: function(score) {
-        this.score.innerText = score;
+        if(this.score) this.score.innerText = score;
     },
 
     updateXp: function(current, max) {
         let pct = (current / max) * 100;
-        this.xpBar.style.width = pct + '%';
+        if(this.xpBar) this.xpBar.style.width = pct + '%';
     },
 
     updateLevel: function(lvl) {
-        this.level.innerText = lvl;
+        if(this.level) this.level.innerText = lvl;
     },
 
     showUpgradeMenu: function() {
         Game.pauseGame();
         this.upgradeModal.classList.remove('hidden');
-        this.upgradeModal.style.display = 'block'; // Ensure visibility
+        this.upgradeModal.style.display = 'block'; 
         this.generateCards();
     },
 
@@ -241,6 +272,7 @@ const UI = {
     },
 
     applyUpgrade: function(type) {
+        if(!Game.player) return;
         const p = Game.player;
         const w = p.weapon;
 
@@ -255,3 +287,4 @@ const UI = {
         this.hideUpgradeMenu();
     }
 };
+
