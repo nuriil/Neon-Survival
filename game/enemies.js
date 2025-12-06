@@ -55,7 +55,7 @@ class Enemy {
         if (type === 'boss') {
             this.radius = 40;
             this.speed = 60; // DÜZENLEME: Hız 80'den 60'a düştü
-            this.hp = 600 * (1 + Game.gameLevel * 0.5); // Can 500'den 400'e düştü
+            this.hp = 450 * (1 + Game.gameLevel * 0.5); // Can 500'den 400'e düştü
             this.color = '#ff0000';
             // GÜNCELLEME: Hasar 15'ten 5'e indirildi (Çok az hasar)
             this.damage = 5; 
@@ -63,7 +63,7 @@ class Enemy {
         } else {
             this.radius = 15;
             this.speed = 90 + Math.random() * 30; // DÜZENLEME: Hız 120'den 90'a düştü
-            this.hp = 20 * (1 + Game.gameLevel * 0.2); // Can 30'dan 20'ye düştü
+            this.hp = 40 * (1 + Game.gameLevel * 0.2); // Can 30'dan 20'ye düştü
             this.color = '#ff5555';
             // GÜNCELLEME: Hasar 5'ten 1'e indirildi (Minimum hasar)
             this.damage = 1; 
@@ -152,5 +152,6 @@ class Enemy {
         }
     }
 }
+
 
 
