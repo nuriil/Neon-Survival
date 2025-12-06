@@ -3,7 +3,7 @@ const WEAPONS = [
     {
         name: 'PISTOL',
         fireRate: 0.4,       // Saniyede ateş hızı
-        damage: 15,
+        damage: 10,
         speed: 800,
         count: 1,            // Mermi sayısı
         spread: 0.05,        // Dağılma açısı (radyan)
@@ -163,3 +163,4 @@ class Bullet {
     }
 
 }
+
