@@ -5,7 +5,7 @@ const EnemySpawner = {
 
     reset: function() {
         this.timer = 0;
-        this.spawnRate = 4.0;
+        this.spawnRate = 5.0;
         Game.enemies = [];
     },
 
@@ -14,7 +14,7 @@ const EnemySpawner = {
         if (this.timer <= 0) {
             this.spawnBatch();
             this.timer = this.spawnRate;
-            this.spawnRate = Math.max(0.2, 1.0 - (Game.score / 500));
+            this.spawnRate = Math.max(0.2, 0.8 - (Game.score / 500));
         }
     },
 
@@ -155,6 +155,7 @@ class Enemy {
         }
     }
 }
+
 
 
 
