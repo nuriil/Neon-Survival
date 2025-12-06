@@ -1,11 +1,11 @@
 const EnemySpawner = {
     timer: 0,
-    spawnRate: 1.0, 
-    difficultyMultiplier: 1.0,
+    spawnRate: 2.0, 
+    difficultyMultiplier: 2.0,
 
     reset: function() {
         this.timer = 0;
-        this.spawnRate = 1.0;
+        this.spawnRate = 2.0;
         Game.enemies = [];
     },
 
@@ -67,9 +67,9 @@ class Enemy {
             this.radius = 15;
             this.speed = 110 + Math.random() * 30; // Biraz yavaşladı
             // DENGELEME: Pistol 25 vuruyor, 3 vuruş = 75 HP
-            this.hp = 75 * (1 + Game.gameLevel * 0.1); 
+            this.hp = 70 * (1 + Game.gameLevel * 0.1); 
             this.color = '#ff5555';
-            this.damage = 4;
+            this.damage = 1;
             this.xpValue = 10;
         }
     }
@@ -155,4 +155,5 @@ class Enemy {
         }
     }
 }
+
 
