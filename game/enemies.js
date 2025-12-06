@@ -98,7 +98,7 @@ class Enemy {
             // Level 10 Zombi HP: 150
             this.hp = 60 * hpMulti; 
             this.color = '#ff5555';
-            this.damage = 0.8 + Math.floor(level * 0.5);
+            this.damage = 0.9 + Math.floor(level * 0.5);
             this.xpValue = 10 + level;
         }
     }
@@ -190,6 +190,7 @@ class Enemy {
         }
     }
 }
+
 
 
 
