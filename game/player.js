@@ -4,8 +4,8 @@ class Player {
         this.y = y;
         this.radius = 20;
         this.speed = 250;
-        this.maxHp = 100;
-        this.hp = 100;
+        this.maxHp = 200;
+        this.hp = 200;
         
         // Economy & Stats
         this.coins = 0;
@@ -137,3 +137,4 @@ class Player {
         UI.showUpgradeMenu();
     }
 }
+
