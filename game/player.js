@@ -4,20 +4,19 @@ class Player {
         this.y = y;
         this.radius = 20;
         this.speed = 250;
-        this.maxHp = 200;
-        this.hp = 200;
+        this.maxHp = 100;
+        this.hp = 100;
         
-        // Economy & Stats
+        // --- EKONOMİ VE KOSTÜM SİSTEMİ ---
         this.coins = 0;
         this.magnetRange = 100;
         this.xp = 0;
         this.nextLevelXp = 100;
         this.level = 1;
 
-        // Skin System
-        // Mevcut Kostüm: { color, shape ('circle', 'square') }
+        // Bu kısım EKSİK ise Market açılmaz!
         this.currentSkin = { id: 'default', color: '#00d2ff', shape: 'circle' };
-        this.ownedSkins = ['default']; // Satın alınanların ID'si
+        this.ownedSkins = ['default']; 
 
         // Weapon
         this.weapon = new WeaponController(this);
@@ -34,7 +33,6 @@ class Player {
             if (Game.keys['KeyD'] || Game.keys['ArrowRight']) dx = 1;
         }
 
-        // Normalize vector
         if (dx !== 0 || dy !== 0) {
             let len = Math.sqrt(dx*dx + dy*dy);
             dx /= len;
@@ -47,57 +45,56 @@ class Player {
         this.x = Math.max(this.radius, Math.min(nextX, Game.map.width - this.radius));
         this.y = Math.max(this.radius, Math.min(nextY, Game.map.height - this.radius));
 
-        // Silah güncelle
         this.weapon.update(dt);
-        
-        // UI Güncelle
         UI.updateHp(this.hp, this.maxHp);
     }
 
     draw(ctx) {
-        // Karakter Gövdesi (Kostüme göre)
         ctx.beginPath();
         
-        if (this.currentSkin.shape === 'square') {
+        // Kostüm şekline göre çizim
+        if (this.currentSkin && this.currentSkin.shape === 'square') {
             let s = this.radius * 2;
             ctx.rect(this.x - this.radius, this.y - this.radius, s, s);
         } else {
             ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
         }
 
-        ctx.fillStyle = this.currentSkin.color; 
+        // Kostüm rengi kontrolü (Hata önleyici)
+        let color = this.currentSkin ? this.currentSkin.color : '#00d2ff';
+        
+        ctx.fillStyle = color; 
         ctx.fill();
         ctx.strokeStyle = '#fff';
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        ctx.shadowColor = this.currentSkin.color;
+        ctx.shadowColor = color;
         ctx.shadowBlur = 15;
 
-        // Silah Yönü - Fareye Baksın
         let angle = Math.atan2(Game.mouse.worldY - this.y, Game.mouse.worldX - this.x);
         
         ctx.save();
         ctx.translate(this.x, this.y);
         ctx.rotate(angle);
         
-        // Silah Çizimi
         ctx.fillStyle = '#333';
-        ctx.fillRect(10, -5, 25, 10); // Namlu
+        ctx.fillRect(10, -5, 25, 10);
         ctx.fillStyle = '#777';
-        ctx.fillRect(0, -5, 10, 10); // Kabza
+        ctx.fillRect(0, -5, 10, 10);
         
         ctx.restore();
         ctx.shadowBlur = 0;
     }
 
     takeDamage(amount) {
-        // Safe Zone içinde hasar almaz (opsiyonel)
         let distToShop = Math.sqrt((this.x - Game.shop.x)**2 + (this.y - Game.shop.y)**2);
         if (distToShop < Game.shop.safeZoneRadius) return;
 
         this.hp -= amount;
-        Effects.spawnBlood(this.x, this.y, this.currentSkin.color);
+        let bloodColor = this.currentSkin ? this.currentSkin.color : '#ff0000';
+        Effects.spawnBlood(this.x, this.y, bloodColor);
+        
         if (this.hp <= 0) {
             UI.showGameOver();
             Game.isRunning = false;
@@ -137,4 +134,3 @@ class Player {
         UI.showUpgradeMenu();
     }
 }
-
