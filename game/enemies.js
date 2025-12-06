@@ -1,7 +1,7 @@
 const EnemySpawner = {
     timer: 0,
-    spawnRate: 2.0, 
-    difficultyMultiplier: 2.0,
+    spawnRate: 4.5, 
+    difficultyMultiplier: 4.5,
 
     reset: function() {
         this.timer = 0;
@@ -155,5 +155,6 @@ class Enemy {
         }
     }
 }
+
 
 
