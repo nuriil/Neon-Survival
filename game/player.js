@@ -7,11 +7,17 @@ class Player {
         this.maxHp = 100;
         this.hp = 100;
         
-        // Stats
+        // Economy & Stats
+        this.coins = 0;
         this.magnetRange = 100;
         this.xp = 0;
         this.nextLevelXp = 100;
         this.level = 1;
+
+        // Skin System
+        // Mevcut Kostüm: { color, shape ('circle', 'square') }
+        this.currentSkin = { id: 'default', color: '#00d2ff', shape: 'circle' };
+        this.ownedSkins = ['default']; // Satın alınanların ID'si
 
         // Weapon
         this.weapon = new WeaponController(this);
@@ -21,10 +27,12 @@ class Player {
         let dx = 0;
         let dy = 0;
 
-        if (Game.keys['KeyW'] || Game.keys['ArrowUp']) dy = -1;
-        if (Game.keys['KeyS'] || Game.keys['ArrowDown']) dy = 1;
-        if (Game.keys['KeyA'] || Game.keys['ArrowLeft']) dx = -1;
-        if (Game.keys['KeyD'] || Game.keys['ArrowRight']) dx = 1;
+        if (!Game.isPaused) {
+            if (Game.keys['KeyW'] || Game.keys['ArrowUp']) dy = -1;
+            if (Game.keys['KeyS'] || Game.keys['ArrowDown']) dy = 1;
+            if (Game.keys['KeyA'] || Game.keys['ArrowLeft']) dx = -1;
+            if (Game.keys['KeyD'] || Game.keys['ArrowRight']) dx = 1;
+        }
 
         // Normalize vector
         if (dx !== 0 || dy !== 0) {
@@ -47,16 +55,23 @@ class Player {
     }
 
     draw(ctx) {
-        // Karakter Gövdesi
+        // Karakter Gövdesi (Kostüme göre)
         ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-        ctx.fillStyle = '#00d2ff'; 
+        
+        if (this.currentSkin.shape === 'square') {
+            let s = this.radius * 2;
+            ctx.rect(this.x - this.radius, this.y - this.radius, s, s);
+        } else {
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        }
+
+        ctx.fillStyle = this.currentSkin.color; 
         ctx.fill();
         ctx.strokeStyle = '#fff';
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        ctx.shadowColor = '#00d2ff';
+        ctx.shadowColor = this.currentSkin.color;
         ctx.shadowBlur = 15;
 
         // Silah Yönü - Fareye Baksın
@@ -68,7 +83,6 @@ class Player {
         
         // Silah Çizimi
         ctx.fillStyle = '#333';
-        // Silah tipine göre uzunluk değişebilir ama şimdilik standart
         ctx.fillRect(10, -5, 25, 10); // Namlu
         ctx.fillStyle = '#777';
         ctx.fillRect(0, -5, 10, 10); // Kabza
@@ -78,8 +92,12 @@ class Player {
     }
 
     takeDamage(amount) {
+        // Safe Zone içinde hasar almaz (opsiyonel)
+        let distToShop = Math.sqrt((this.x - Game.shop.x)**2 + (this.y - Game.shop.y)**2);
+        if (distToShop < Game.shop.safeZoneRadius) return;
+
         this.hp -= amount;
-        Effects.spawnBlood(this.x, this.y, '#00d2ff');
+        Effects.spawnBlood(this.x, this.y, this.currentSkin.color);
         if (this.hp <= 0) {
             UI.showGameOver();
             Game.isRunning = false;
@@ -92,6 +110,20 @@ class Player {
             this.levelUp();
         }
         UI.updateXp(this.xp, this.nextLevelXp);
+    }
+
+    gainCoins(amount) {
+        this.coins += amount;
+        UI.updateCoins(this.coins);
+        Effects.showDamage(this.x, this.y - 30, "+" + amount + " G", "#FFD700");
+    }
+
+    setSkin(skinData) {
+        this.currentSkin = {
+            id: skinData.id,
+            color: skinData.color,
+            shape: skinData.shape
+        };
     }
 
     levelUp() {
