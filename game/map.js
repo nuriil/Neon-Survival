@@ -62,10 +62,11 @@ class GameMap {
         ctx.fillStyle = '#fff';
         ctx.font = 'bold 30px Arial';
         ctx.textAlign = 'center';
-        ctx.fillText("MARKET", s.x, s.y - s.radius - 20);
+        ctx.fillText("MARKET", s.x, s.y - s.radius + 10);
 
         // Kapı
         ctx.fillStyle = '#222';
         ctx.fillRect(s.x - 25, s.y + s.radius - 60, 50, 60);
     }
 }
+
