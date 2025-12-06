@@ -16,7 +16,6 @@ const Game = {
     bullets: [],
     items: [],
     particles: [],
-    damageTexts: [],
     
     score: 0,
     gameLevel: 1,
@@ -25,12 +24,11 @@ const Game = {
     shop: {
         x: 1500,
         y: 1500,
-        radius: 100, // Bina boyutu
-        safeZoneRadius: 350, // Düşmanların yaklaşamadığı alan
+        radius: 100, 
+        safeZoneRadius: 350, 
         active: true
     },
 
-    // Input Durumları
     keys: {},
     mouse: { x: 0, y: 0, worldX: 0, worldY: 0, down: false },
 
@@ -38,14 +36,12 @@ const Game = {
         this.canvas = document.getElementById('gameCanvas');
         this.ctx = this.canvas.getContext('2d');
         
-        // UI Başlat
         UI.init();
 
         this.resize();
         window.addEventListener('resize', () => this.resize());
         
         this.map = new GameMap(3000, 3000);
-        // Oyuncuyu marketin yanına koyalım
         this.player = new Player(1400, 1500); 
         this.setupInputs();
         
@@ -81,9 +77,12 @@ const Game = {
             }
 
             // Silah Değiştirme (1-4)
+            // YENİ KURAL: Sadece sahip olunan silahlara geçiş yapılabilir.
             if (['Digit1', 'Digit2', 'Digit3', 'Digit4'].includes(e.code)) {
                 const weaponIndex = parseInt(e.key) - 1;
-                this.player.weapon.switchWeapon(weaponIndex);
+                if (this.player.ownedWeapons.includes(weaponIndex)) {
+                     this.player.weapon.switchWeapon(weaponIndex);
+                }
             }
         });
 
@@ -125,8 +124,7 @@ const Game = {
             this.update(dt);
             this.draw();
         } else if (this.isShopOpen) {
-            // Market açıkken arkada oyun dursun ama çizilsin
-            this.draw();
+            this.draw(); // Market açıkken arka planı çiz
         } else {
             // Duraklatma ekranı
             this.draw();
@@ -154,7 +152,6 @@ const Game = {
         this.camera.x += (targetCamX - this.camera.x) * 5 * dt;
         this.camera.y += (targetCamY - this.camera.y) * 5 * dt;
 
-        // Mouse Dünya Koordinatı
         this.mouse.worldX = this.mouse.x + this.camera.x;
         this.mouse.worldY = this.mouse.y + this.camera.y;
 
@@ -169,11 +166,9 @@ const Game = {
         this.enemies.forEach((e, i) => {
             e.update(dt);
             if (e.markedForDeletion) {
-                // %100 Coin düşme ihtimali
+                // Item düşürme (XP ve Coin)
                 ItemFactory.createCoin(e.x, e.y, 10);
-                
-                // %50 XP düşme ihtimali
-                if (Math.random() < 0.5) ItemFactory.createXP(e.x, e.y, 10);
+                if (Math.random() < 0.6) ItemFactory.createXP(e.x, e.y, 15);
                 
                 this.enemies.splice(i, 1);
             }
@@ -196,8 +191,6 @@ const Game = {
         this.ctx.translate(-this.camera.x, -this.camera.y);
 
         this.map.draw(this.ctx, this.camera);
-        
-        // Market Çizimi (Safe Zone)
         this.map.drawShop(this.ctx);
 
         this.items.forEach(i => i.draw(this.ctx));
@@ -216,13 +209,12 @@ const Game = {
 
         Effects.draw(this.ctx);
         
-        // Market Etkileşim İpucu
         let dist = Math.sqrt((this.player.x - this.shop.x)**2 + (this.player.y - this.shop.y)**2);
         if (dist < this.shop.radius + 100) {
             this.ctx.fillStyle = "white";
             this.ctx.font = "20px Arial";
             this.ctx.textAlign = "center";
-            this.ctx.fillText("Press 'E' to Shop", this.shop.x, this.shop.y - 120);
+            this.ctx.fillText("Market için 'E' bas", this.shop.x, this.shop.y - 120);
         }
 
         this.ctx.restore();
