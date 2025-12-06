@@ -2,43 +2,43 @@
 const WEAPONS = [
     {
         name: 'PISTOL',
-        fireRate: 0.4,       // Saniyede ateş hızı
-        damage: 10,
+        fireRate: 0.4,       
+        damage: 25,          // 75 HP Zombi -> 3 vuruş
         speed: 800,
-        count: 1,            // Mermi sayısı
-        spread: 0.05,        // Dağılma açısı (radyan)
+        count: 1,            
+        spread: 0.05,        
         color: '#ffff00',
-        pierce: 1            // Kaç düşmanı deler
+        pierce: 1            
     },
     {
         name: 'MACHINE GUN',
-        fireRate: 0.1,       // Çok hızlı
-        damage: 12,
+        fireRate: 0.12,      // Biraz yavaşlattık denge için
+        damage: 15,          // 75 HP -> 5 vuruş (Seri atıyor)
         speed: 900,
         count: 1,
-        spread: 0.15,        // Biraz dağılır
+        spread: 0.15,        
         color: '#00ff00',
         pierce: 1
     },
     {
         name: 'SHOTGUN',
-        fireRate: 2.0,       // Yavaş
-        damage: 14,
+        fireRate: 1.0,       
+        damage: 15,          // Pellet başına 15. 6 pellet = 90 dmg (Tek atar yakından)
         speed: 700,
-        count: 4,            // 6 mermi atar
-        spread: 0.5,         // Geniş dağılım
+        count: 6,            
+        spread: 0.5,         
         color: '#ffaa00',
-        pierce: 2            // 2 kişiyi deler
+        pierce: 2            
     },
     {
         name: 'SNIPER',
-        fireRate: 2.2,       // Çok yavaş
-        damage: 150,         // Çok yüksek hasar
-        speed: 1500,         // Çok hızlı mermi
+        fireRate: 1.5,       
+        damage: 200,         // Kesin tek atar
+        speed: 1500,         
         count: 1,
-        spread: 0.0,         // Sıfır hata payı
+        spread: 0.0,         
         color: '#00d2ff',
-        pierce: 10           // Her şeyi deler geçer
+        pierce: 10           
     }
 ];
 
@@ -46,10 +46,9 @@ class WeaponController {
     constructor(owner) {
         this.owner = owner;
         this.timer = 0;
-        this.currentWeaponIndex = 0; // Pistol ile başla
+        this.currentWeaponIndex = 0; 
         this.activeWeapon = WEAPONS[this.currentWeaponIndex];
         
-        // Upgrade çarpanları
         this.modifiers = {
             damage: 1.0,
             fireRate: 1.0,
@@ -61,9 +60,8 @@ class WeaponController {
         if (index >= 0 && index < WEAPONS.length) {
             this.currentWeaponIndex = index;
             this.activeWeapon = WEAPONS[index];
-            this.timer = 0.5; // Değiştirince hemen ateş edemesin (küçük bir gecikme)
+            this.timer = 0.5; 
             
-            // UI Güncelle
             const uiName = document.getElementById('weapon-name');
             if(uiName) uiName.innerText = this.activeWeapon.name;
         }
@@ -71,18 +69,17 @@ class WeaponController {
 
     update(dt) {
         this.timer -= dt;
+        
+        // Market açıkken ateş edemesin
+        if (Game.isShopOpen) return;
 
-        // Mouse Basılı mı?
         if (Game.mouse.down && this.timer <= 0) {
             this.shoot();
-            // Ateş hızı hesaplama (Upgrade çarpanları dahil)
             this.timer = this.activeWeapon.fireRate * this.modifiers.fireRate;
         }
     }
 
     shoot() {
-        // Hedef: Mouse'un Dünya Koordinatları
-        // atan2(y2-y1, x2-x1)
         let targetAngle = Math.atan2(
             Game.mouse.worldY - this.owner.y, 
             Game.mouse.worldX - this.owner.x
@@ -91,17 +88,12 @@ class WeaponController {
         let bulletCount = this.activeWeapon.count + this.modifiers.count;
 
         for(let i=0; i<bulletCount; i++) {
-            // Spread (Dağılma) Hesabı
-            // Eğer tek mermi ise spread'i rastgele sağa sola ver
-            // Çoklu mermiyse yelpaze şeklinde aç
             let spreadOffset;
             
             if (bulletCount === 1) {
                 spreadOffset = (Math.random() - 0.5) * this.activeWeapon.spread;
             } else {
-                // Shotgun mantığı: Yelpaze
                 spreadOffset = (i - (bulletCount-1)/2) * (this.activeWeapon.spread / bulletCount);
-                // Hafif rastgelelik de ekle
                 spreadOffset += (Math.random() - 0.5) * 0.05;
             }
 
@@ -128,11 +120,11 @@ class Bullet {
         this.vy = Math.sin(angle) * speed;
         this.damage = damage;
         this.color = color;
-        this.pierce = pierce || 1; // Kaç düşmanı delip geçebilir
+        this.pierce = pierce || 1; 
         
         this.radius = 6;
         this.markedForDeletion = false;
-        this.life = 1.5; // Ömür
+        this.life = 1.5; 
     }
 
     update(dt) {
@@ -153,7 +145,6 @@ class Bullet {
         ctx.fillStyle = this.color;
         ctx.fill();
         
-        // Kuyruk efekti
         ctx.beginPath();
         ctx.moveTo(this.x, this.y);
         ctx.lineTo(this.x - this.vx * 0.04, this.y - this.vy * 0.04);
@@ -161,6 +152,4 @@ class Bullet {
         ctx.lineWidth = 2;
         ctx.stroke();
     }
-
 }
-
