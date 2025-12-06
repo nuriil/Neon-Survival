@@ -7,18 +7,23 @@ class Player {
         this.maxHp = 100;
         this.hp = 100;
         
-        // --- EKONOMİ VE KOSTÜM SİSTEMİ ---
+        // --- EKONOMİ VE GELİŞİM ---
         this.coins = 0;
         this.magnetRange = 100;
+        this.armor = 0; // Yüzde kaç hasar azaltacağı (0.1 = %10)
+        
         this.xp = 0;
         this.nextLevelXp = 100;
         this.level = 1;
 
-        // Bu kısım EKSİK ise Market açılmaz!
+        // --- ENVANTER ---
         this.currentSkin = { id: 'default', color: '#00d2ff', shape: 'circle' };
         this.ownedSkins = ['default']; 
+        
+        // YENİ: Sadece tabanca ile başla (Index 0)
+        this.ownedWeapons = [0]; 
 
-        // Weapon
+        // Weapon Controller
         this.weapon = new WeaponController(this);
     }
 
@@ -52,7 +57,7 @@ class Player {
     draw(ctx) {
         ctx.beginPath();
         
-        // Kostüm şekline göre çizim
+        // Şekil çizimi
         if (this.currentSkin && this.currentSkin.shape === 'square') {
             let s = this.radius * 2;
             ctx.rect(this.x - this.radius, this.y - this.radius, s, s);
@@ -60,7 +65,6 @@ class Player {
             ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
         }
 
-        // Kostüm rengi kontrolü (Hata önleyici)
         let color = this.currentSkin ? this.currentSkin.color : '#00d2ff';
         
         ctx.fillStyle = color; 
@@ -72,26 +76,28 @@ class Player {
         ctx.shadowColor = color;
         ctx.shadowBlur = 15;
 
+        // Silah yönünü gösteren küçük kutu
         let angle = Math.atan2(Game.mouse.worldY - this.y, Game.mouse.worldX - this.x);
-        
         ctx.save();
         ctx.translate(this.x, this.y);
         ctx.rotate(angle);
-        
         ctx.fillStyle = '#333';
         ctx.fillRect(10, -5, 25, 10);
         ctx.fillStyle = '#777';
         ctx.fillRect(0, -5, 10, 10);
-        
         ctx.restore();
         ctx.shadowBlur = 0;
     }
 
     takeDamage(amount) {
+        // Market alanında hasar alma
         let distToShop = Math.sqrt((this.x - Game.shop.x)**2 + (this.y - Game.shop.y)**2);
         if (distToShop < Game.shop.safeZoneRadius) return;
 
-        this.hp -= amount;
+        // Zırh hesaplaması (Hasar azaltma)
+        let reducedAmount = amount * (1 - this.armor);
+        this.hp -= reducedAmount;
+        
         let bloodColor = this.currentSkin ? this.currentSkin.color : '#ff0000';
         Effects.spawnBlood(this.x, this.y, bloodColor);
         
@@ -122,13 +128,32 @@ class Player {
             shape: skinData.shape
         };
     }
+    
+    // YENİ: Silah satın alma veya kuşanma
+    buyWeapon(index, price) {
+        // Zaten sahipsek kuşan
+        if (this.ownedWeapons.includes(index)) {
+            this.weapon.switchWeapon(index);
+            return true;
+        }
+        // Değilsek ve para yetiyorsa al
+        if (this.coins >= price) {
+            this.coins -= price;
+            this.ownedWeapons.push(index);
+            this.weapon.switchWeapon(index);
+            UI.updateCoins(this.coins);
+            Effects.showDamage(this.x, this.y, "SİLAH ALINDI!", "#00ff00");
+            return true;
+        }
+        return false;
+    }
 
     levelUp() {
         this.level++;
         this.xp -= this.nextLevelXp;
         this.nextLevelXp = Math.floor(this.nextLevelXp * 1.5);
         this.maxHp += 10;
-        this.hp = this.maxHp;
+        this.hp = this.maxHp; // Level atlayınca can dolsun
         
         UI.updateLevel(this.level);
         UI.showUpgradeMenu();
