@@ -1,6 +1,6 @@
 const EnemySpawner = {
     timer: 0,
-    spawnRate: 2.5, // BAŞLANGIÇ: Daha yavaş spawn (2.5 saniye)
+    spawnRate: 2.5, 
     
     reset: function() {
         this.timer = 0;
@@ -11,11 +11,14 @@ const EnemySpawner = {
     update: function(dt) {
         this.timer -= dt;
         
-        // ZORLUK AYARI: Player leveline göre spawn hızını güncelle
-        // Level 1: 2.5sn, Level 10: 2.0sn, Level 20: 1.5sn gibi yavaş bir artış.
-        // Minimum 0.4 saniyeye kadar düşebilir (çok ileriki levellerde).
+        // ZORLUK DENGESİ:
+        // Level 1: 2.5 sn
+        // Her levelda süre %5 kısalır.
+        // Min limit: 0.3 sn (Makineli tüfek gibi düşman yağar)
         let currentLevel = Game.player ? Game.player.level : 1;
-        let targetRate = Math.max(0.4, 2.5 - (currentLevel * 0.05));
+        
+        // Bu formül zorluğun yavaşça ama hissedilir şekilde artmasını sağlar
+        let targetRate = Math.max(0.3, 2.5 * Math.pow(0.95, currentLevel - 1));
         
         if (this.timer <= 0) {
             this.spawnBatch(currentLevel);
@@ -27,22 +30,23 @@ const EnemySpawner = {
         // Güvenli alanın DIŞINDA spawn olmalı
         let validPos = false;
         let px, py;
-        let safeDist = Game.shop.safeZoneRadius + 200;
+        let safeDist = Game.shop.safeZoneRadius + 150;
 
-        // Level arttıkça aynı anda doğan düşman sayısı çok yavaş artsın
-        // Level 1-4: 1 düşman
-        // Level 5-9: 2 düşman
-        // Level 10+: artarak gider
-        let count = 1 + Math.floor(level / 5);
-        if (count > 6) count = 6; // Maksimum limit
+        // Level arttıkça sürü kalabalıklaşır
+        // Level 1-3: 1-2 düşman
+        // Level 10: 4-5 düşman
+        // Formül: 1 + (Level / 4)
+        let count = 1 + Math.floor(level / 4);
+        count = Math.min(count, 8); // Tek seferde max 8 düşman spawn olsun (PC kasmasın)
 
         for(let i = 0; i < count; i++) {
             validPos = false;
             let attempts = 0;
-            while(!validPos && attempts < 10) {
+            while(!validPos && attempts < 15) {
                 attempts++;
                 let angle = Math.random() * Math.PI * 2;
-                let dist = 700 + Math.random() * 200; 
+                // Oyuncunun etrafında rastgele bir çemberde doğarlar
+                let dist = 600 + Math.random() * 300; 
                 px = Game.player.x + Math.cos(angle) * dist;
                 py = Game.player.y + Math.sin(angle) * dist;
                 
@@ -55,19 +59,20 @@ const EnemySpawner = {
                 if (distShop > safeDist) validPos = true;
             }
 
-            // Boss çıkma ihtimali (Skora göre değil level moduna göre)
-            // Her 5 levelda bir boss şansı artar
-            let isBoss = (level % 5 === 0) && (Math.random() < 0.2); // %20 şansla boss
+            // Boss mantığı: Her 5 levelda bir boss gelme şansı başlar.
+            // Level 5: %10, Level 10: %20...
+            let bossChance = (level >= 5 && level % 5 === 0) ? 0.3 : 0.01;
+            let isBoss = Math.random() < bossChance;
             
             if (validPos) {
-                 Game.enemies.push(new Enemy(px, py, isBoss ? 'boss' : 'zombie'));
+                 Game.enemies.push(new Enemy(px, py, isBoss ? 'boss' : 'zombie', level));
             }
         }
     }
 };
 
 class Enemy {
-    constructor(x, y, type) {
+    constructor(x, y, type, level) {
         this.x = x;
         this.y = y;
         this.type = type;
@@ -75,24 +80,26 @@ class Enemy {
         this.pushX = 0;
         this.pushY = 0;
         
-        let level = Game.player ? Game.player.level : 1;
+        // ZORLUK STATLARI (Level'a göre güçlenme)
+        let hpMulti = 1 + (level * 0.15); // Her level %15 daha fazla can
+        let speedMulti = 1 + (level * 0.02); // Her level %2 daha hızlı (çok hızlanmasın)
 
         if (type === 'boss') {
-            this.radius = 45;
-            this.speed = 85 + (level * 2);
-            this.hp = 500 * (1 + level * 0.2); // Boss HP'si levella artar
+            this.radius = 50;
+            this.speed = 90 * speedMulti;
+            this.hp = 600 * hpMulti; 
             this.color = '#ff0000';
-            this.damage = 30;
-            this.xpValue = 200;
+            this.damage = 30 + level;
+            this.xpValue = 200 + (level * 10);
         } else {
-            this.radius = 15;
-            // Zombi hızı çok yavaş artar
-            this.speed = 100 + (level * 1.5); 
-            // HP: Level 1'de kolay (50), sonra azar azar artar
-            this.hp = 50 + (level * 10); 
+            this.radius = 16;
+            this.speed = (100 + Math.random() * 40) * speedMulti;
+            // Level 1 Zombi HP: 60
+            // Level 10 Zombi HP: 150
+            this.hp = 60 * hpMulti; 
             this.color = '#ff5555';
-            this.damage = 5 + Math.floor(level * 0.5);
-            this.xpValue = 10 + Math.floor(level * 2);
+            this.damage = 8 + Math.floor(level * 0.5);
+            this.xpValue = 10 + level;
         }
     }
 
@@ -101,8 +108,9 @@ class Enemy {
         let distToShop = Math.sqrt((this.x - Game.shop.x)**2 + (this.y - Game.shop.y)**2);
         if (distToShop < Game.shop.safeZoneRadius) {
             let angle = Math.atan2(this.y - Game.shop.y, this.x - Game.shop.x);
-            this.x += Math.cos(angle) * 200 * dt;
-            this.y += Math.sin(angle) * 200 * dt;
+            // Markete yaklaşınca çok hızlı geri itilirler
+            this.x += Math.cos(angle) * 300 * dt;
+            this.y += Math.sin(angle) * 300 * dt;
             return; 
         }
 
@@ -116,14 +124,15 @@ class Enemy {
             dy /= dist;
         }
 
-        // Separation (Birbirinin içine girmeme)
+        // Sürü Psikolojisi (Separation - Birbirini itme)
         Game.enemies.forEach(other => {
             if (other === this) return;
             let ox = this.x - other.x;
             let oy = this.y - other.y;
             let odist = Math.sqrt(ox*ox + oy*oy);
+            // Eğer çok yakınlarsa birbirlerini iterler
             if (odist < (this.radius + other.radius)) {
-                let force = 150 / (odist * odist + 0.1);
+                let force = 200 / (odist * odist + 0.1);
                 this.pushX += (ox / odist) * force;
                 this.pushY += (oy / odist) * force;
             }
@@ -142,6 +151,9 @@ class Enemy {
         
         if (this.type === 'boss') {
             ctx.rect(this.x - this.radius, this.y - this.radius, this.radius*2, this.radius*2);
+            // Boss can barı (kafada)
+            ctx.fillStyle = 'red';
+            ctx.fillRect(this.x - 20, this.y - 60, 40, 5);
         } else {
             ctx.arc(this.x, this.y, this.radius + (wobble > 0 ? 1 : 0), 0, Math.PI * 2);
         }
@@ -163,16 +175,16 @@ class Enemy {
     takeDamage(amount) {
         this.hp -= amount;
         Effects.spawnBlood(this.x, this.y, '#880000');
-        Effects.showDamage(this.x, this.y - 20, amount);
+        Effects.showDamage(this.x, this.y - 20, Math.floor(amount));
         
         // Vurulunca biraz geri itilme
         let angle = Math.atan2(this.y - Game.player.y, this.x - Game.player.x);
-        this.pushX += Math.cos(angle) * 120;
-        this.pushY += Math.sin(angle) * 120;
+        this.pushX += Math.cos(angle) * 150;
+        this.pushY += Math.sin(angle) * 150;
 
         if (this.hp <= 0) {
             this.markedForDeletion = true;
-            Game.score += (this.type === 'boss' ? 50 : 1); // Skor artışı
+            Game.score += (this.type === 'boss' ? 50 : 1);
             UI.updateScore(Game.score);
             Effects.spawnExplosion(this.x, this.y);
         }
