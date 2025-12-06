@@ -1,3 +1,12 @@
+// Market Ürün Listesi
+const SKINS_DB = [
+    { id: 'default', name: 'Klasik Mavi', price: 0, color: '#00d2ff', shape: 'circle' },
+    { id: 'red_sq', name: 'Kızıl Kare', price: 1000, color: '#ff0000', shape: 'square' },
+    { id: 'green_ci', name: 'Zehir Yeşili', price: 1500, color: '#00ff00', shape: 'circle' },
+    { id: 'gold_sq', name: 'Altın Şövalye', price: 5000, color: '#ffd700', shape: 'square' },
+    { id: 'dark_void', name: 'Kara Delik', price: 10000, color: '#000000', shape: 'circle' }
+];
+
 const UI = {
     hpBar: document.getElementById('hp-bar-fill'),
     hpText: document.getElementById('hp-text'),
@@ -8,6 +17,164 @@ const UI = {
     cardsContainer: document.getElementById('cards-container'),
     gameOverScreen: document.getElementById('game-over-screen'),
     finalScore: document.getElementById('final-score'),
+    
+    // Yeni Elementler için placeholder
+    shopModal: null,
+    coinDisplay: null,
+
+    init: function() {
+        // Coin göstergesini oluştur
+        this.createCoinDisplay();
+        // Shop Modalını oluştur
+        this.createShopModal();
+    },
+
+    createCoinDisplay: function() {
+        let div = document.createElement('div');
+        div.style.position = 'absolute';
+        div.style.top = '60px';
+        div.style.left = '20px';
+        div.style.fontSize = '24px';
+        div.style.color = '#FFD700';
+        div.style.fontFamily = 'Orbitron, sans-serif';
+        div.style.textShadow = '0 0 5px black';
+        div.innerHTML = `💰 <span id="coin-count">0</span>`;
+        document.body.appendChild(div);
+        this.coinDisplay = document.getElementById('coin-count');
+    },
+
+    createShopModal: function() {
+        let modal = document.createElement('div');
+        modal.id = 'shop-modal';
+        modal.className = 'hidden'; // CSS'de .hidden { display: none } var kabul ediyoruz
+        // Inline stil verelim garanti olsun
+        modal.style.display = 'none';
+        modal.style.position = 'fixed';
+        modal.style.top = '50%';
+        modal.style.left = '50%';
+        modal.style.transform = 'translate(-50%, -50%)';
+        modal.style.background = 'rgba(20, 20, 30, 0.95)';
+        modal.style.padding = '30px';
+        modal.style.borderRadius = '15px';
+        modal.style.border = '2px solid #FFD700';
+        modal.style.width = '800px';
+        modal.style.maxHeight = '80%';
+        modal.style.overflowY = 'auto';
+        modal.style.color = 'white';
+        modal.style.fontFamily = 'Orbitron, sans-serif';
+        modal.style.zIndex = '1000';
+
+        let header = document.createElement('div');
+        header.innerHTML = '<h2 style="text-align:center; color:#FFD700; margin-bottom:20px;">MARKET</h2>';
+        header.innerHTML += '<div style="text-align:center; margin-bottom:20px;">Paranız: <span id="shop-money">0</span> 💰</div>';
+        
+        let grid = document.createElement('div');
+        grid.id = 'shop-grid';
+        grid.style.display = 'grid';
+        grid.style.gridTemplateColumns = 'repeat(3, 1fr)';
+        grid.style.gap = '20px';
+
+        let closeBtn = document.createElement('button');
+        closeBtn.innerText = 'KAPAT (E)';
+        closeBtn.style.marginTop = '20px';
+        closeBtn.style.width = '100%';
+        closeBtn.style.padding = '10px';
+        closeBtn.style.background = '#333';
+        closeBtn.style.color = 'white';
+        closeBtn.style.border = 'none';
+        closeBtn.style.cursor = 'pointer';
+        closeBtn.onclick = () => this.closeShop();
+
+        modal.appendChild(header);
+        modal.appendChild(grid);
+        modal.appendChild(closeBtn);
+        document.body.appendChild(modal);
+        
+        this.shopModal = modal;
+    },
+
+    openShop: function() {
+        Game.isShopOpen = true;
+        Game.pauseGame();
+        this.shopModal.style.display = 'block';
+        this.refreshShopItems();
+    },
+
+    closeShop: function() {
+        Game.isShopOpen = false;
+        Game.resumeGame();
+        this.shopModal.style.display = 'none';
+    },
+
+    refreshShopItems: function() {
+        document.getElementById('shop-money').innerText = Game.player.coins;
+        const grid = document.getElementById('shop-grid');
+        grid.innerHTML = '';
+
+        SKINS_DB.forEach(skin => {
+            let itemDiv = document.createElement('div');
+            itemDiv.style.background = '#2a2a3a';
+            itemDiv.style.padding = '15px';
+            itemDiv.style.borderRadius = '10px';
+            itemDiv.style.textAlign = 'center';
+            itemDiv.style.border = Game.player.currentSkin.id === skin.id ? '2px solid #00ff00' : '1px solid #444';
+
+            // Önizleme
+            let shape = skin.shape === 'square' ? 'border-radius:0;' : 'border-radius:50%;';
+            let preview = `<div style="width:40px; height:40px; background:${skin.color}; margin:0 auto 10px; ${shape}"></div>`;
+            
+            let name = `<div style="font-weight:bold; margin-bottom:5px;">${skin.name}</div>`;
+            let price = `<div style="color:#FFD700; margin-bottom:10px;">${skin.price > 0 ? skin.price + ' 💰' : 'Bedava'}</div>`;
+            
+            let btn = document.createElement('button');
+            btn.style.padding = '5px 15px';
+            btn.style.cursor = 'pointer';
+            
+            // Buton Mantığı
+            if (Game.player.ownedSkins.includes(skin.id)) {
+                if (Game.player.currentSkin.id === skin.id) {
+                    btn.innerText = 'GİYİLDİ';
+                    btn.disabled = true;
+                    btn.style.background = '#00ff00';
+                    btn.style.color = '#000';
+                } else {
+                    btn.innerText = 'GİY';
+                    btn.style.background = '#00d2ff';
+                    btn.onclick = () => {
+                        Game.player.setSkin(skin);
+                        this.refreshShopItems();
+                    };
+                }
+            } else {
+                btn.innerText = 'SATIN AL';
+                btn.style.background = '#e63946';
+                if (Game.player.coins >= skin.price) {
+                    btn.onclick = () => {
+                        Game.player.coins -= skin.price;
+                        Game.player.ownedSkins.push(skin.id);
+                        this.updateCoins(Game.player.coins);
+                        Effects.showDamage(Game.player.x, Game.player.y, "Satın Alındı!", "#00ff00");
+                        this.refreshShopItems();
+                    };
+                } else {
+                    btn.disabled = true;
+                    btn.style.opacity = '0.5';
+                    btn.innerText = 'YETERSİZ';
+                }
+            }
+
+            itemDiv.innerHTML = preview + name + price;
+            itemDiv.appendChild(btn);
+            grid.appendChild(itemDiv);
+        });
+    },
+
+    updateCoins: function(amount) {
+        if(this.coinDisplay) this.coinDisplay.innerText = amount;
+        // Market açıksa oradaki parayı da güncelle
+        let shopMoney = document.getElementById('shop-money');
+        if(shopMoney) shopMoney.innerText = amount;
+    },
 
     updateHp: function(current, max) {
         let pct = Math.max(0, (current / max) * 100);
@@ -31,11 +198,13 @@ const UI = {
     showUpgradeMenu: function() {
         Game.pauseGame();
         this.upgradeModal.classList.remove('hidden');
+        this.upgradeModal.style.display = 'block'; // Ensure visibility
         this.generateCards();
     },
 
     hideUpgradeMenu: function() {
         this.upgradeModal.classList.add('hidden');
+        this.upgradeModal.style.display = 'none';
         Game.resumeGame();
     },
 
@@ -47,7 +216,6 @@ const UI = {
     generateCards: function() {
         this.cardsContainer.innerHTML = '';
         
-        // 3 Rastgele özellik seç
         const options = [
             { id: 'dmg', name: 'Hasar Artışı', desc: 'Mermi hasarını %20 artırır.', icon: '⚔️' },
             { id: 'spd', name: 'Hız Artışı', desc: 'Hareket hızını %15 artırır.', icon: '⚡' },
@@ -56,7 +224,6 @@ const UI = {
             { id: 'hp', name: 'Can Yenileme', desc: '%30 can doldurur.', icon: '❤️' }
         ];
 
-        // Rastgele 3 tane seç
         for(let i=0; i<3; i++) {
             let opt = options[Math.floor(Math.random() * options.length)];
             
@@ -78,10 +245,10 @@ const UI = {
         const w = p.weapon;
 
         switch(type) {
-            case 'dmg': w.damage *= 1.2; break;
+            case 'dmg': w.modifiers.damage *= 1.2; break;
             case 'spd': p.speed *= 1.15; break;
-            case 'multi': w.bulletCount++; break;
-            case 'fire': w.fireRate *= 0.85; break;
+            case 'multi': w.modifiers.count++; break;
+            case 'fire': w.modifiers.fireRate *= 0.85; break;
             case 'hp': p.hp = Math.min(p.hp + p.maxHp * 0.3, p.maxHp); break;
         }
         
