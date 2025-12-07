@@ -1,4 +1,3 @@
-// Silah Konfigürasyonları
 const WEAPONS = [
     { name: 'PISTOL', price: 0, fireRate: 0.4, damage: 25, speed: 800, count: 1, spread: 0.05, color: '#ffff00', pierce: 1 },
     { name: 'MACHINE GUN', price: 1500, fireRate: 0.12, damage: 15, speed: 900, count: 1, spread: 0.15, color: '#00ff00', pierce: 1 },
@@ -11,7 +10,7 @@ class WeaponController {
         this.owner = owner;
         this.timer = 0;
         this.currentWeaponIndex = 0; 
-        this.canShoot = true; // Safe zone kontrolü için
+        this.canShoot = true; 
         
         let initialIndex = (owner.ownedWeapons && owner.ownedWeapons.length > 0) ? owner.ownedWeapons[0] : 0;
         if (WEAPONS && WEAPONS.length > 0) {
@@ -38,7 +37,6 @@ class WeaponController {
         this.timer -= dt;
         if (Game.isShopOpen || !this.canShoot) return;
 
-        // Sadece Player için mouse kontrolü, Botlar kendi update fonksiyonunda manuel ateşler
         if (this.owner === Game.player && Game.mouse.down && this.timer <= 0) {
             this.shoot();
             this.timer = this.activeWeapon.fireRate * this.modifiers.fireRate;
