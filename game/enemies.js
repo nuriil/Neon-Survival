@@ -11,13 +11,12 @@ const EnemySpawner = {
     },
 
     update: function(dt) {
-        // Eğer Boss Modundaysak veya Market açıksa düşman spawnlama
         if (Game.bossMode || Game.isShopOpen) return;
 
         this.timer -= dt;
         let currentLevel = Game.player ? Game.player.level : 1;
         
-        // HER 7 LEVELDE BİR BOSS KONTROLÜ
+        // Her 7 Levelde Bir Boss
         if (currentLevel > 1 && currentLevel % 7 === 0 && !Game.bossMode) {
             this.startBossFight(currentLevel);
             return;
@@ -33,20 +32,19 @@ const EnemySpawner = {
 
     startBossFight: function(level) {
         Game.bossMode = true;
-        // Mevcut tüm düşmanları sil
+        // Mevcut düşmanları temizle
         Game.enemies.forEach(e => Effects.spawnExplosion(e.x, e.y));
         Game.enemies = [];
         Game.enemyBullets = [];
         
         UI.showBossWarning(true);
 
-        // Boss Spawn Et (Oyuncudan uzak)
+        // Boss Spawn
         let angle = Math.random() * Math.PI * 2;
         let dist = 800;
         let bx = Game.player.x + Math.cos(angle) * dist;
         let by = Game.player.y + Math.sin(angle) * dist;
         
-        // Sınır kontrolü
         bx = Math.max(100, Math.min(bx, Game.map.width - 100));
         by = Math.max(100, Math.min(by, Game.map.height - 100));
 
@@ -94,19 +92,18 @@ class Enemy {
         this.pushY = 0;
         this.level = level;
 
-        // BOSS SİLAH STATE
         this.attackTimer = 0;
-        this.attackCooldown = 3.0; // Boss 3 saniyede bir ateş eder
+        this.attackCooldown = 3.0; 
 
         let hpMulti = 1 + (level * 0.15); 
         let speedMulti = 1 + (level * 0.02);
 
         if (type === 'boss') {
-            this.radius = 80; // Boss artık çok daha büyük
+            this.radius = 80; 
             this.speed = 110 * speedMulti;
-            this.hp = 3000 * hpMulti; // Boss canı çok yüksek
+            this.hp = 3000 * hpMulti; 
             this.maxHp = this.hp;
-            this.color = '#8800ff'; // Mor renkli boss
+            this.color = '#8800ff'; 
             this.damage = 40 + level;
         } else {
             this.radius = 16;
@@ -119,33 +116,31 @@ class Enemy {
     }
 
     update(dt) {
-        // Safe Zone İtme
-        let distToShop = Math.sqrt((this.x - Game.shop.x)**2 + (this.y - Game.shop.y)**2);
-        if (distToShop < Game.shop.safeZoneRadius) {
-            let angle = Math.atan2(this.y - Game.shop.y, this.x - Game.shop.x);
-            this.x += Math.cos(angle) * 300 * dt;
-            this.y += Math.sin(angle) * 300 * dt;
-            return; 
+        // Safe Zone İtme (Normal zamanda)
+        if (!Game.bossMode) {
+            let distToShop = Math.sqrt((this.x - Game.shop.x)**2 + (this.y - Game.shop.y)**2);
+            if (distToShop < Game.shop.safeZoneRadius) {
+                let angle = Math.atan2(this.y - Game.shop.y, this.x - Game.shop.x);
+                this.x += Math.cos(angle) * 300 * dt;
+                this.y += Math.sin(angle) * 300 * dt;
+            }
         }
 
-        // Oyuncuya Yönelme Kontrolü
-        let playerInSafeZone = Math.sqrt((Game.player.x - Game.shop.x)**2 + (Game.player.y - Game.shop.y)**2) < Game.shop.safeZoneRadius;
+        let playerInSafeZone = false;
+        if (!Game.bossMode) {
+            playerInSafeZone = Math.sqrt((Game.player.x - Game.shop.x)**2 + (Game.player.y - Game.shop.y)**2) < Game.shop.safeZoneRadius;
+        }
         
         let targetX, targetY;
 
         if (playerInSafeZone) {
-            // Oyuncu güvendeyse düşmanlar onu göremez, rastgele dolaşır veya durur.
-            // Sadece hafif bir titreme hareketi yapalım (Idle)
             let wanderAngle = Date.now() / 500 + this.x;
             targetX = this.x + Math.cos(wanderAngle) * 50;
             targetY = this.y + Math.sin(wanderAngle) * 50;
         } else {
-            // Normal takip
-            // Eğer Bot varsa ve düşmana daha yakınsa ona saldırsın (Basit aggro)
             let target = Game.player;
             let minDist = Math.sqrt((this.x - Game.player.x)**2 + (this.y - Game.player.y)**2);
 
-            // Boss modunda botlar yok, o yüzden kontrol etmeye gerek yok
             if (!Game.bossMode) {
                 for(let bot of Game.bots) {
                     let d = Math.sqrt((this.x - bot.x)**2 + (this.y - bot.y)**2);
@@ -159,7 +154,6 @@ class Enemy {
             targetY = target.y;
         }
 
-        // Hareket
         let dx = targetX - this.x;
         let dy = targetY - this.y;
         let dist = Math.sqrt(dx*dx + dy*dy);
@@ -169,7 +163,7 @@ class Enemy {
             dy /= dist;
         }
 
-        // Sürü Psikolojisi
+        // Birbirini itme
         Game.enemies.forEach(other => {
             if (other === this) return;
             let ox = this.x - other.x;
@@ -185,7 +179,6 @@ class Enemy {
         this.pushX *= 0.9;
         this.pushY *= 0.9;
 
-        // Boss Ateş Mantığı
         if (this.type === 'boss' && !playerInSafeZone) {
             this.attackTimer -= dt;
             if (this.attackTimer <= 0) {
@@ -196,15 +189,16 @@ class Enemy {
 
         this.x += (dx * this.speed + this.pushX) * dt;
         this.y += (dy * this.speed + this.pushY) * dt;
+
+        // HARİTA SINIRLARI KONTROLÜ (YENİ EKLENDİ - Dışarı çıkamazlar)
+        this.x = Math.max(this.radius, Math.min(this.x, Game.map.width - this.radius));
+        this.y = Math.max(this.radius, Math.min(this.y, Game.map.height - this.radius));
     }
 
     shootProjectile() {
-        // Boss oyuncuya ateş topu atar
         let angle = Math.atan2(Game.player.y - this.y, Game.player.x - this.x);
-        // Kaçılabilir olması için biraz yavaş ama büyük bir mermi
         let speed = 400; 
         let damage = this.damage * 1.5;
-        
         Game.enemyBullets.push(new EnemyBullet(this.x, this.y, angle, speed, damage));
     }
 
@@ -213,9 +207,7 @@ class Enemy {
         let wobble = Math.sin(Date.now() / 100) * 2;
         
         if (this.type === 'boss') {
-            // Boss çizimi (Daha heybetli)
             ctx.fillStyle = this.color;
-            // Dikenli yapı
             for(let i=0; i<8; i++) {
                 let a = (Date.now()/500) + (i * Math.PI * 2) / 8;
                 let rx = this.x + Math.cos(a) * (this.radius + 10);
@@ -229,7 +221,6 @@ class Enemy {
             ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
             ctx.fill();
             
-            // Boss HP Bar
             let hpPct = this.hp / this.maxHp;
             ctx.fillStyle = 'black';
             ctx.fillRect(this.x - 50, this.y - 100, 100, 10);
@@ -237,7 +228,6 @@ class Enemy {
             ctx.fillRect(this.x - 50, this.y - 100, 100 * hpPct, 10);
 
         } else {
-            // Zombi
             ctx.arc(this.x, this.y, this.radius + (wobble > 0 ? 1 : 0), 0, Math.PI * 2);
             ctx.fillStyle = this.color;
             ctx.fill();
@@ -247,7 +237,6 @@ class Enemy {
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // Gözler
         ctx.fillStyle = 'yellow';
         ctx.beginPath();
         ctx.arc(this.x - this.radius/3, this.y - 5, 3, 0, Math.PI*2);
@@ -280,7 +269,7 @@ class EnemyBullet {
         this.vx = Math.cos(angle) * speed;
         this.vy = Math.sin(angle) * speed;
         this.damage = damage;
-        this.radius = 15; // Büyük mermi
+        this.radius = 15; 
         this.life = 3.0;
         this.markedForDeletion = false;
     }
