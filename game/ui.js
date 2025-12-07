@@ -1,7 +1,7 @@
 const SKINS_DB = [
     { id: 'default', name: 'Klasik Mavi', price: 0, color: '#00d2ff', shape: 'circle', desc: 'Dengeli.', bonuses: {} },
     { id: 'red_sq', name: 'Kızıl Kare', price: 1500, color: '#ff0000', shape: 'square', desc: 'Hasar +%20, Can +20', bonuses: { damage: 1.2, maxHp: 20 } },
-    { id: 'green_ci', name: 'Zehir Yeşili', price: 2500, color: '#00ff00', shape: 'circle', desc: 'Hız +%20, Seri Ateş +%10', bonuses: { speed: 1.2, fireRate: 0.9 } }, // fireRate 0.9 = %10 daha hızlı
+    { id: 'green_ci', name: 'Zehir Yeşili', price: 2500, color: '#00ff00', shape: 'circle', desc: 'Hız +%20, Seri Ateş +%10', bonuses: { speed: 1.2, fireRate: 0.9 } }, 
     { id: 'gold_sq', name: 'Altın Şövalye', price: 6000, color: '#ffd700', shape: 'square', desc: 'Zırh +%15, Can +50', bonuses: { armor: 0.15, maxHp: 50 } },
     { id: 'dark_void', name: 'Kara Delik', price: 12000, color: '#000000', shape: 'circle', desc: 'Hasar x2, Zırh -%20', bonuses: { damage: 2.0, armor: -0.2 } }
 ];
@@ -17,6 +17,7 @@ const UI = {
     gameOverScreen: document.getElementById('game-over-screen'),
     finalScore: document.getElementById('final-score'),
     bossWarning: null,
+    notification: null,
     
     shopModal: null,
     coinDisplay: null,
@@ -25,6 +26,7 @@ const UI = {
         this.createCoinDisplay();
         this.createShopModal();
         this.createBossWarning();
+        this.createNotification();
     },
 
     createCoinDisplay: function() {
@@ -53,8 +55,36 @@ const UI = {
         this.bossWarning = div;
     },
 
+    createNotification: function() {
+        let div = document.createElement('div');
+        div.id = 'game-notification';
+        div.style.position = 'fixed'; div.style.top = '100px'; div.style.left = '50%';
+        div.style.transform = 'translate(-50%, 0)';
+        div.style.fontSize = '30px'; div.style.color = '#fff';
+        div.style.fontFamily = 'Orbitron, sans-serif'; div.style.textShadow = '0 0 10px black';
+        div.style.fontWeight = 'bold';
+        div.style.display = 'none';
+        div.style.zIndex = '1900';
+        div.style.textAlign = 'center';
+        document.body.appendChild(div);
+        this.notification = div;
+    },
+
     showBossWarning: function(show) {
         if(this.bossWarning) this.bossWarning.style.display = show ? 'block' : 'none';
+    },
+
+    showNotification: function(text, color = 'white') {
+        if (!this.notification) return;
+        this.notification.innerText = text;
+        this.notification.style.color = color;
+        this.notification.style.display = 'block';
+        this.notification.style.opacity = '1';
+        
+        // Animasyonlu kayboluş
+        setTimeout(() => {
+            this.notification.style.display = 'none';
+        }, 3000);
     },
 
     createShopModal: function() {
@@ -149,10 +179,7 @@ const UI = {
                 if(coins >= currentBotPrice) {
                     Game.player.coins -= currentBotPrice;
                     Game.shop.botCount++;
-                    
-                    // Botu oluştur ve oyuna ekle
                     Game.bots.push(new Bot(Game.player.x, Game.player.y));
-                    
                     Effects.showDamage(Game.player.x, Game.player.y, "BOT GELDİ!", "#00d2ff");
                     this.refreshShopItems();
                     UI.updateCoins(Game.player.coins);
@@ -161,7 +188,6 @@ const UI = {
         }
         botDiv.appendChild(buyBotBtn);
         contentDiv.appendChild(botDiv);
-
 
         // 2. SİLAHLAR
         let weaponHeader = document.createElement('h3');
@@ -268,16 +294,15 @@ const UI = {
     updateXp: function(current, max) { if(this.xpBar) this.xpBar.style.width = (current/max*100) + '%'; },
     updateLevel: function(lvl) { if(this.level) this.level.innerText = lvl; },
 
-    // isChest: true ise Sandık (1 kart), false ise Level Up (3 kart)
-    showUpgradeMenu: function(isChest = false) {
+    showUpgradeMenu: function() {
         Game.pauseGame();
         this.upgradeModal.classList.remove('hidden');
         this.upgradeModal.style.display = 'block'; 
         
         let title = this.upgradeModal.querySelector('h2');
-        if(title) title.innerText = isChest ? "SANDIK AÇILDI!" : "SEVİYE ATLADIN!";
+        if(title) title.innerText = "SEVİYE ATLADIN!";
 
-        this.generateCards(isChest);
+        this.generateCards();
     },
 
     hideUpgradeMenu: function() {
@@ -291,10 +316,9 @@ const UI = {
         this.finalScore.innerText = Game.score;
     },
 
-    generateCards: function(isChest) {
+    generateCards: function() {
         this.cardsContainer.innerHTML = '';
         
-        // GENİŞLETİLMİŞ UPGRADE HAVUZU
         const options = [
             { id: 'dmg', name: 'Hasar', desc: '%50 Ekstra hasar.', icon: '⚔️' },
             { id: 'spd', name: 'Hız', desc: '%30 Daha hızlı.', icon: '👟' },
@@ -307,11 +331,10 @@ const UI = {
             { id: 'maxhp', name: 'Can Deposu', desc: '+50 Max Can.', icon: '💊' }
         ];
 
-        let count = isChest ? 1 : 3;
         let selected = [];
         let pool = [...options];
 
-        for(let i=0; i<count; i++) {
+        for(let i=0; i<3; i++) {
             if(pool.length === 0) break;
             let rnd = Math.floor(Math.random() * pool.length);
             selected.push(pool[rnd]);
