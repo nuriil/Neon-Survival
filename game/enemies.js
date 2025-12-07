@@ -6,18 +6,23 @@ const EnemySpawner = {
         this.timer = 0;
         this.spawnRate = 2.5; 
         Game.enemies = [];
+        Game.enemyBullets = [];
+        Game.bossMode = false;
     },
 
     update: function(dt) {
+        // Eğer Boss Modundaysak veya Market açıksa düşman spawnlama
+        if (Game.bossMode || Game.isShopOpen) return;
+
         this.timer -= dt;
-        
-        // ZORLUK DENGESİ:
-        // Level 1: 2.5 sn
-        // Her levelda süre %5 kısalır.
-        // Min limit: 0.3 sn (Makineli tüfek gibi düşman yağar)
         let currentLevel = Game.player ? Game.player.level : 1;
         
-        // Bu formül zorluğun yavaşça ama hissedilir şekilde artmasını sağlar
+        // HER 7 LEVELDE BİR BOSS KONTROLÜ
+        if (currentLevel > 1 && currentLevel % 7 === 0 && !Game.bossMode) {
+            this.startBossFight(currentLevel);
+            return;
+        }
+
         let targetRate = Math.max(0.3, 2.5 * Math.pow(0.95, currentLevel - 1));
         
         if (this.timer <= 0) {
@@ -26,18 +31,34 @@ const EnemySpawner = {
         }
     },
 
+    startBossFight: function(level) {
+        Game.bossMode = true;
+        // Mevcut tüm düşmanları sil
+        Game.enemies.forEach(e => Effects.spawnExplosion(e.x, e.y));
+        Game.enemies = [];
+        Game.enemyBullets = [];
+        
+        UI.showBossWarning(true);
+
+        // Boss Spawn Et (Oyuncudan uzak)
+        let angle = Math.random() * Math.PI * 2;
+        let dist = 800;
+        let bx = Game.player.x + Math.cos(angle) * dist;
+        let by = Game.player.y + Math.sin(angle) * dist;
+        
+        // Sınır kontrolü
+        bx = Math.max(100, Math.min(bx, Game.map.width - 100));
+        by = Math.max(100, Math.min(by, Game.map.height - 100));
+
+        Game.enemies.push(new Enemy(bx, by, 'boss', level));
+    },
+
     spawnBatch: function(level) {
-        // Güvenli alanın DIŞINDA spawn olmalı
         let validPos = false;
         let px, py;
         let safeDist = Game.shop.safeZoneRadius + 150;
-
-        // Level arttıkça sürü kalabalıklaşır
-        // Level 1-3: 1-2 düşman
-        // Level 10: 4-5 düşman
-        // Formül: 1 + (Level / 4)
         let count = 1 + Math.floor(level / 4);
-        count = Math.min(count, 8); // Tek seferde max 8 düşman spawn olsun (PC kasmasın)
+        count = Math.min(count, 8); 
 
         for(let i = 0; i < count; i++) {
             validPos = false;
@@ -45,27 +66,19 @@ const EnemySpawner = {
             while(!validPos && attempts < 15) {
                 attempts++;
                 let angle = Math.random() * Math.PI * 2;
-                // Oyuncunun etrafında rastgele bir çemberde doğarlar
                 let dist = 600 + Math.random() * 300; 
                 px = Game.player.x + Math.cos(angle) * dist;
                 py = Game.player.y + Math.sin(angle) * dist;
                 
-                // Harita sınırları
                 px = Math.max(50, Math.min(px, Game.map.width - 50));
                 py = Math.max(50, Math.min(py, Game.map.height - 50));
 
-                // Marketten yeterince uzak mı?
                 let distShop = Math.sqrt((px - Game.shop.x)**2 + (py - Game.shop.y)**2);
                 if (distShop > safeDist) validPos = true;
             }
 
-            // Boss mantığı: Her 5 levelda bir boss gelme şansı başlar.
-            // Level 5: %10, Level 10: %20...
-            let bossChance = (level >= 5 && level % 5 === 0) ? 0.3 : 0.01;
-            let isBoss = Math.random() < bossChance;
-            
             if (validPos) {
-                 Game.enemies.push(new Enemy(px, py, isBoss ? 'boss' : 'zombie', level));
+                 Game.enemies.push(new Enemy(px, py, 'zombie', level));
             }
         }
     }
@@ -79,44 +92,76 @@ class Enemy {
         this.markedForDeletion = false;
         this.pushX = 0;
         this.pushY = 0;
-        
-        // ZORLUK STATLARI (Level'a göre güçlenme)
-        let hpMulti = 1 + (level * 0.15); // Her level %15 daha fazla can
-        let speedMulti = 1 + (level * 0.02); // Her level %2 daha hızlı (çok hızlanmasın)
+        this.level = level;
+
+        // BOSS SİLAH STATE
+        this.attackTimer = 0;
+        this.attackCooldown = 3.0; // Boss 3 saniyede bir ateş eder
+
+        let hpMulti = 1 + (level * 0.15); 
+        let speedMulti = 1 + (level * 0.02);
 
         if (type === 'boss') {
-            this.radius = 50;
-            this.speed = 90 * speedMulti;
-            this.hp = 600 * hpMulti; 
-            this.color = '#ff0000';
-            this.damage = 30 + level;
-            this.xpValue = 200 + (level * 10);
+            this.radius = 80; // Boss artık çok daha büyük
+            this.speed = 110 * speedMulti;
+            this.hp = 3000 * hpMulti; // Boss canı çok yüksek
+            this.maxHp = this.hp;
+            this.color = '#8800ff'; // Mor renkli boss
+            this.damage = 40 + level;
         } else {
             this.radius = 16;
             this.speed = (100 + Math.random() * 40) * speedMulti;
-            // Level 1 Zombi HP: 60
-            // Level 10 Zombi HP: 150
             this.hp = 60 * hpMulti; 
+            this.maxHp = this.hp;
             this.color = '#ff5555';
             this.damage = 1 + Math.floor(level * 0.5);
-            this.xpValue = 10 + level;
         }
     }
 
     update(dt) {
-        // Safe Zone Kontrolü (Geri itme)
+        // Safe Zone İtme
         let distToShop = Math.sqrt((this.x - Game.shop.x)**2 + (this.y - Game.shop.y)**2);
         if (distToShop < Game.shop.safeZoneRadius) {
             let angle = Math.atan2(this.y - Game.shop.y, this.x - Game.shop.x);
-            // Markete yaklaşınca çok hızlı geri itilirler
             this.x += Math.cos(angle) * 300 * dt;
             this.y += Math.sin(angle) * 300 * dt;
             return; 
         }
 
-        // Oyuncuya yönel
-        let dx = Game.player.x - this.x;
-        let dy = Game.player.y - this.y;
+        // Oyuncuya Yönelme Kontrolü
+        let playerInSafeZone = Math.sqrt((Game.player.x - Game.shop.x)**2 + (Game.player.y - Game.shop.y)**2) < Game.shop.safeZoneRadius;
+        
+        let targetX, targetY;
+
+        if (playerInSafeZone) {
+            // Oyuncu güvendeyse düşmanlar onu göremez, rastgele dolaşır veya durur.
+            // Sadece hafif bir titreme hareketi yapalım (Idle)
+            let wanderAngle = Date.now() / 500 + this.x;
+            targetX = this.x + Math.cos(wanderAngle) * 50;
+            targetY = this.y + Math.sin(wanderAngle) * 50;
+        } else {
+            // Normal takip
+            // Eğer Bot varsa ve düşmana daha yakınsa ona saldırsın (Basit aggro)
+            let target = Game.player;
+            let minDist = Math.sqrt((this.x - Game.player.x)**2 + (this.y - Game.player.y)**2);
+
+            // Boss modunda botlar yok, o yüzden kontrol etmeye gerek yok
+            if (!Game.bossMode) {
+                for(let bot of Game.bots) {
+                    let d = Math.sqrt((this.x - bot.x)**2 + (this.y - bot.y)**2);
+                    if (d < minDist) {
+                        minDist = d;
+                        target = bot;
+                    }
+                }
+            }
+            targetX = target.x;
+            targetY = target.y;
+        }
+
+        // Hareket
+        let dx = targetX - this.x;
+        let dy = targetY - this.y;
         let dist = Math.sqrt(dx*dx + dy*dy);
         
         if (dist > 0) {
@@ -124,13 +169,12 @@ class Enemy {
             dy /= dist;
         }
 
-        // Sürü Psikolojisi (Separation - Birbirini itme)
+        // Sürü Psikolojisi
         Game.enemies.forEach(other => {
             if (other === this) return;
             let ox = this.x - other.x;
             let oy = this.y - other.y;
             let odist = Math.sqrt(ox*ox + oy*oy);
-            // Eğer çok yakınlarsa birbirlerini iterler
             if (odist < (this.radius + other.radius)) {
                 let force = 200 / (odist * odist + 0.1);
                 this.pushX += (ox / odist) * force;
@@ -141,8 +185,27 @@ class Enemy {
         this.pushX *= 0.9;
         this.pushY *= 0.9;
 
+        // Boss Ateş Mantığı
+        if (this.type === 'boss' && !playerInSafeZone) {
+            this.attackTimer -= dt;
+            if (this.attackTimer <= 0) {
+                this.shootProjectile();
+                this.attackTimer = this.attackCooldown;
+            }
+        }
+
         this.x += (dx * this.speed + this.pushX) * dt;
         this.y += (dy * this.speed + this.pushY) * dt;
+    }
+
+    shootProjectile() {
+        // Boss oyuncuya ateş topu atar
+        let angle = Math.atan2(Game.player.y - this.y, Game.player.x - this.x);
+        // Kaçılabilir olması için biraz yavaş ama büyük bir mermi
+        let speed = 400; 
+        let damage = this.damage * 1.5;
+        
+        Game.enemyBullets.push(new EnemyBullet(this.x, this.y, angle, speed, damage));
     }
 
     draw(ctx) {
@@ -150,16 +213,36 @@ class Enemy {
         let wobble = Math.sin(Date.now() / 100) * 2;
         
         if (this.type === 'boss') {
-            ctx.rect(this.x - this.radius, this.y - this.radius, this.radius*2, this.radius*2);
-            // Boss can barı (kafada)
+            // Boss çizimi (Daha heybetli)
+            ctx.fillStyle = this.color;
+            // Dikenli yapı
+            for(let i=0; i<8; i++) {
+                let a = (Date.now()/500) + (i * Math.PI * 2) / 8;
+                let rx = this.x + Math.cos(a) * (this.radius + 10);
+                let ry = this.y + Math.sin(a) * (this.radius + 10);
+                ctx.beginPath();
+                ctx.arc(rx, ry, 15, 0, Math.PI*2);
+                ctx.fill();
+            }
+            
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Boss HP Bar
+            let hpPct = this.hp / this.maxHp;
+            ctx.fillStyle = 'black';
+            ctx.fillRect(this.x - 50, this.y - 100, 100, 10);
             ctx.fillStyle = 'red';
-            ctx.fillRect(this.x - 20, this.y - 60, 40, 5);
+            ctx.fillRect(this.x - 50, this.y - 100, 100 * hpPct, 10);
+
         } else {
+            // Zombi
             ctx.arc(this.x, this.y, this.radius + (wobble > 0 ? 1 : 0), 0, Math.PI * 2);
+            ctx.fillStyle = this.color;
+            ctx.fill();
         }
         
-        ctx.fillStyle = this.color;
-        ctx.fill();
         ctx.strokeStyle = '#330000';
         ctx.lineWidth = 2;
         ctx.stroke();
@@ -167,8 +250,8 @@ class Enemy {
         // Gözler
         ctx.fillStyle = 'yellow';
         ctx.beginPath();
-        ctx.arc(this.x - 5, this.y - 5, 3, 0, Math.PI*2);
-        ctx.arc(this.x + 5, this.y - 5, 3, 0, Math.PI*2);
+        ctx.arc(this.x - this.radius/3, this.y - 5, 3, 0, Math.PI*2);
+        ctx.arc(this.x + this.radius/3, this.y - 5, 3, 0, Math.PI*2);
         ctx.fill();
     }
 
@@ -177,21 +260,45 @@ class Enemy {
         Effects.spawnBlood(this.x, this.y, '#880000');
         Effects.showDamage(this.x, this.y - 20, Math.floor(amount));
         
-        // Vurulunca biraz geri itilme
         let angle = Math.atan2(this.y - Game.player.y, this.x - Game.player.x);
         this.pushX += Math.cos(angle) * 150;
         this.pushY += Math.sin(angle) * 150;
 
         if (this.hp <= 0) {
             this.markedForDeletion = true;
-            Game.score += (this.type === 'boss' ? 50 : 1);
+            Game.score += (this.type === 'boss' ? 500 : 1);
             UI.updateScore(Game.score);
             Effects.spawnExplosion(this.x, this.y);
         }
     }
 }
 
+class EnemyBullet {
+    constructor(x, y, angle, speed, damage) {
+        this.x = x;
+        this.y = y;
+        this.vx = Math.cos(angle) * speed;
+        this.vy = Math.sin(angle) * speed;
+        this.damage = damage;
+        this.radius = 15; // Büyük mermi
+        this.life = 3.0;
+        this.markedForDeletion = false;
+    }
 
+    update(dt) {
+        this.x += this.vx * dt;
+        this.y += this.vy * dt;
+        this.life -= dt;
+        if(this.life <= 0) this.markedForDeletion = true;
+    }
 
-
-
+    draw(ctx) {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2);
+        ctx.fillStyle = '#ff4400';
+        ctx.fill();
+        ctx.strokeStyle = '#ffff00';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+    }
+}
