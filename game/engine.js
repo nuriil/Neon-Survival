@@ -8,13 +8,19 @@ const Game = {
     isPaused: false,
     isShopOpen: false,
     
-    // Oyun Sistemleri
+    // Oyun Durumu
+    bossMode: false, // Boss savaşı aktif mi?
+    
+    // Varlıklar
     player: null,
+    bots: [], // Satın alınan yardımcılar
     map: null,
     camera: { x: 0, y: 0 },
     enemies: [],
-    bullets: [],
+    bullets: [], // Oyuncu mermileri
+    enemyBullets: [], // Boss mermileri
     items: [],
+    chests: [], // Hazine sandıkları
     particles: [],
     
     score: 0,
@@ -26,18 +32,22 @@ const Game = {
         y: 1500,
         radius: 100, 
         safeZoneRadius: 350, 
-        active: true
+        active: true,
+        botPrice: 1200, // Bot başlangıç fiyatı
+        botCount: 0 // Kaç bot alındı
     },
 
     keys: {},
     mouse: { x: 0, y: 0, worldX: 0, worldY: 0, down: false },
+
+    // Zamanlayıcılar
+    chestTimer: 0,
 
     init: function() {
         this.canvas = document.getElementById('gameCanvas');
         this.ctx = this.canvas.getContext('2d');
         
         UI.init();
-
         this.resize();
         window.addEventListener('resize', () => this.resize());
         
@@ -61,22 +71,15 @@ const Game = {
     },
 
     setupInputs: function() {
-        // Klavye
         window.addEventListener('keydown', e => {
             this.keys[e.code] = true;
-
-            // P Tuşu - Duraklatma
             if (e.code === 'KeyP' && !this.isShopOpen) {
                 if (this.isPaused) this.resumeGame();
                 else this.pauseGame();
             }
-
-            // E Tuşu - Market Etkileşimi
-            if (e.code === 'KeyE') {
-                this.checkShopInteraction();
-            }
-
-            // Silah Değiştirme (1-4)
+            if (e.code === 'KeyE') this.checkShopInteraction();
+            
+            // Silah Değişimi
             if (['Digit1', 'Digit2', 'Digit3', 'Digit4'].includes(e.code)) {
                 const weaponIndex = parseInt(e.key) - 1;
                 if (this.player.ownedWeapons.includes(weaponIndex)) {
@@ -86,36 +89,24 @@ const Game = {
         });
 
         window.addEventListener('keyup', e => this.keys[e.code] = false);
-
-        // Mouse Hareket
         window.addEventListener('mousemove', e => {
             this.mouse.x = e.clientX;
             this.mouse.y = e.clientY;
         });
-
-        // Mouse Tıklama (Ateş)
-        window.addEventListener('mousedown', e => {
-            if(e.button === 0) this.mouse.down = true; 
-        });
-        window.addEventListener('mouseup', e => {
-            if(e.button === 0) this.mouse.down = false;
-        });
+        window.addEventListener('mousedown', e => { if(e.button === 0) this.mouse.down = true; });
+        window.addEventListener('mouseup', e => { if(e.button === 0) this.mouse.down = false; });
     },
 
     checkShopInteraction: function() {
         let dist = Math.sqrt((this.player.x - this.shop.x)**2 + (this.player.y - this.shop.y)**2);
         if (dist < this.shop.radius + 100) {
-            if (this.isShopOpen) {
-                UI.closeShop();
-            } else {
-                UI.openShop();
-            }
+            if (this.isShopOpen) UI.closeShop();
+            else UI.openShop();
         }
     },
 
     loop: function(timestamp) {
         if (!this.isRunning) return;
-
         const dt = (timestamp - this.lastTime) / 1000;
         this.lastTime = timestamp;
 
@@ -123,9 +114,8 @@ const Game = {
             this.update(dt);
             this.draw();
         } else if (this.isShopOpen) {
-            this.draw(); // Market açıkken arka planı çiz
+            this.draw(); 
         } else {
-            // Duraklatma ekranı
             this.draw();
             this.ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
             this.ctx.fillRect(0, 0, this.width, this.height);
@@ -134,50 +124,78 @@ const Game = {
             this.ctx.textAlign = "center";
             this.ctx.fillText("PAUSED", this.width/2, this.height/2);
         }
-        
         requestAnimationFrame((t) => this.loop(t));
     },
 
     update: function(dt) {
         if (dt > 0.1) dt = 0.1;
 
-        // Kamera Takibi
+        // Kamera
         let targetCamX = this.player.x - this.width / 2;
         let targetCamY = this.player.y - this.height / 2;
-        
         targetCamX = Math.max(0, Math.min(targetCamX, this.map.width - this.width));
         targetCamY = Math.max(0, Math.min(targetCamY, this.map.height - this.height));
-
         this.camera.x += (targetCamX - this.camera.x) * 5 * dt;
         this.camera.y += (targetCamY - this.camera.y) * 5 * dt;
-
         this.mouse.worldX = this.mouse.x + this.camera.x;
         this.mouse.worldY = this.mouse.y + this.camera.y;
 
+        // Update Entity'leri
         this.player.update(dt);
+        
+        // Botlar (Boss savaşında yok olurlar)
+        if (!this.bossMode) {
+            this.bots.forEach(bot => bot.update(dt));
+        }
+
         EnemySpawner.update(dt);
         
+        // Mermiler
         this.bullets.forEach((b, i) => {
             b.update(dt);
             if (b.markedForDeletion) this.bullets.splice(i, 1);
         });
 
+        // Düşman Mermileri (Boss Ateşi)
+        this.enemyBullets.forEach((b, i) => {
+            b.update(dt);
+            if (b.markedForDeletion) this.enemyBullets.splice(i, 1);
+        });
+
+        // Düşmanlar
         this.enemies.forEach((e, i) => {
             e.update(dt);
             if (e.markedForDeletion) {
-                // Item düşürme (XP ve Coin)
-                // DEĞİŞİKLİK: Coin miktarı 10'dan 30'a çıkarıldı.
-                ItemFactory.createCoin(e.x, e.y, 30);
-                
-                if (Math.random() < 0.6) ItemFactory.createXP(e.x, e.y, 15);
-                
+                // Boss öldü mü?
+                if (e.type === 'boss') {
+                    this.bossMode = false; // Normal moda dön
+                    ItemFactory.createCoin(e.x, e.y, 2000); // Büyük ödül
+                    UI.showBossWarning(false); // Yazıyı kaldır
+                } else {
+                    ItemFactory.createCoin(e.x, e.y, 30);
+                    if (Math.random() < 0.6) ItemFactory.createXP(e.x, e.y, 15);
+                }
                 this.enemies.splice(i, 1);
             }
         });
 
+        // Eşyalar
         this.items.forEach((item, i) => {
             item.update(dt);
             if (item.markedForDeletion) this.items.splice(i, 1);
+        });
+
+        // Sandık Spawner
+        if (!this.bossMode) {
+            this.chestTimer -= dt;
+            if (this.chestTimer <= 0) {
+                ItemFactory.createChest();
+                this.chestTimer = Math.random() * 60 + 60; // 60-120 saniyede bir
+            }
+        }
+        
+        this.chests.forEach((c, i) => {
+            if(c.markedForDeletion) this.chests.splice(i, 1);
         });
 
         Effects.update(dt);
@@ -194,22 +212,35 @@ const Game = {
         this.map.draw(this.ctx, this.camera);
         this.map.drawShop(this.ctx);
 
+        // Yerdeki Eşyalar ve Sandıklar
         this.items.forEach(i => i.draw(this.ctx));
+        this.chests.forEach(c => c.draw(this.ctx));
 
         this.ctx.shadowColor = 'rgba(0,0,0,0.5)';
         this.ctx.shadowBlur = 10;
         
         this.enemies.forEach(e => e.draw(this.ctx));
+        
+        // Botlar
+        if (!this.bossMode) {
+            this.bots.forEach(b => b.draw(this.ctx));
+        }
+
         this.player.draw(this.ctx);
         
         this.ctx.shadowBlur = 0;
 
+        // Mermiler
         this.ctx.globalCompositeOperation = 'lighter';
         this.bullets.forEach(b => b.draw(this.ctx));
+        
+        // Düşman Mermileri (Kırmızı/Turuncu)
+        this.enemyBullets.forEach(b => b.draw(this.ctx));
         this.ctx.globalCompositeOperation = 'source-over';
 
         Effects.draw(this.ctx);
         
+        // Market Yazısı
         let dist = Math.sqrt((this.player.x - this.shop.x)**2 + (this.player.y - this.shop.y)**2);
         if (dist < this.shop.radius + 100) {
             this.ctx.fillStyle = "white";
@@ -221,19 +252,13 @@ const Game = {
         this.ctx.restore();
     },
     
-    pauseGame: function() {
-        this.isPaused = true;
-    },
-    
-    resumeGame: function() {
-        this.isPaused = false;
-        this.lastTime = performance.now();
-    }
+    pauseGame: function() { this.isPaused = true; },
+    resumeGame: function() { this.isPaused = false; this.lastTime = performance.now(); }
 };
 
 const CollisionManager = {
     check: function() {
-        // 1. Mermiler vs Düşmanlar
+        // 1. Oyuncu Mermileri vs Düşmanlar
         Game.bullets.forEach(bullet => {
             Game.enemies.forEach(enemy => {
                 if (this.isColliding(bullet, enemy)) {
@@ -243,8 +268,7 @@ const CollisionManager = {
                     Effects.spawnHitEffect(bullet.x, bullet.y);
                 }
             });
-            
-            // Mermiler vs Engeller (Ağaç/Kaya)
+            // Mermiler vs Engeller
             Game.map.obstacles.forEach(obs => {
                 if (this.isColliding(bullet, obs)) {
                     bullet.markedForDeletion = true;
@@ -253,19 +277,55 @@ const CollisionManager = {
             });
         });
 
-        // 2. Düşman vs Oyuncu
+        // 2. Boss Mermileri vs Oyuncu (ve Botlar)
+        Game.enemyBullets.forEach(bullet => {
+            // Oyuncuya değdi mi?
+            if (this.isColliding(bullet, Game.player)) {
+                Game.player.takeDamage(bullet.damage);
+                bullet.markedForDeletion = true;
+            }
+            // Botlara değdi mi? (Opsiyonel, şimdilik botlar hasar almasın karmaşa olmasın)
+            
+            // Duvarlara değdi mi?
+             Game.map.obstacles.forEach(obs => {
+                if (this.isColliding(bullet, obs)) {
+                    bullet.markedForDeletion = true;
+                    Effects.spawnHitEffect(bullet.x, bullet.y);
+                }
+            });
+        });
+
+        // 3. Düşman vs Oyuncu / Botlar
         Game.enemies.forEach(enemy => {
             if (this.dist(enemy.x, enemy.y, Game.player.x, Game.player.y) < (enemy.radius + Game.player.radius)) {
                 Game.player.takeDamage(enemy.damage);
             }
-            // Düşman vs Engel (Çarpışma çözümü)
+            // Botlarla çarpışma (Botlar sadece iter)
+            if (!Game.bossMode) {
+                Game.bots.forEach(bot => {
+                     if (this.dist(enemy.x, enemy.y, bot.x, bot.y) < (enemy.radius + bot.radius)) {
+                        // İtme efekti
+                        let angle = Math.atan2(enemy.y - bot.y, enemy.x - bot.x);
+                        enemy.pushX += Math.cos(angle) * 100;
+                        enemy.pushY += Math.sin(angle) * 100;
+                    }
+                });
+            }
+            
             this.resolveMapCollision(enemy);
         });
 
-        // 3. Oyuncu vs Engel (Çarpışma çözümü)
+        // 4. Oyuncu vs Engel & Sandık
         this.resolveMapCollision(Game.player);
+        
+        // Oyuncu vs Sandık (Collision değil, trigger)
+        Game.chests.forEach(chest => {
+            if (this.isColliding(Game.player, chest)) {
+                chest.open();
+            }
+        });
 
-        // 4. Eşyalar vs Oyuncu
+        // 5. Eşyalar vs Oyuncu
         Game.items.forEach(item => {
             let d = this.dist(item.x, item.y, Game.player.x, Game.player.y);
             if (d < Game.player.magnetRange) {
@@ -277,7 +337,6 @@ const CollisionManager = {
         });
     },
 
-    // Yeni: Harita objelerine çarpınca itme
     resolveMapCollision: function(entity) {
         Game.map.obstacles.forEach(obs => {
             let dx = entity.x - obs.x;
@@ -286,7 +345,6 @@ const CollisionManager = {
             let minDist = entity.radius + obs.radius;
 
             if (dist < minDist) {
-                // İç içe geçmişler, dışarı it
                 let angle = Math.atan2(dy, dx);
                 let pushForce = minDist - dist;
                 entity.x += Math.cos(angle) * pushForce;
@@ -295,14 +353,13 @@ const CollisionManager = {
         });
     },
 
-    isColliding: function(circle1, circle2) {
-        let dx = circle1.x - circle2.x;
-        let dy = circle1.y - circle2.y;
+    isColliding: function(c1, c2) {
+        let dx = c1.x - c2.x;
+        let dy = c1.y - c2.y;
         let dist = Math.sqrt(dx*dx + dy*dy);
-        return dist < (circle1.radius + circle2.radius);
+        return dist < (c1.radius + c2.radius);
     },
 
-    dist: function(x1, y1, x2, y2) {
-        return Math.sqrt((x1-x2)**2 + (y1-y2)**2);
-    }
+    dist: function(x1, y1, x2, y2) { return Math.sqrt((x1-x2)**2 + (y1-y2)**2); }
 };
+
