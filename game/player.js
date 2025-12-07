@@ -1,3 +1,4 @@
+// player.js
 class Player {
     constructor(x, y) {
         this.x = x; this.y = y; this.radius = 20;
@@ -47,15 +48,10 @@ class Player {
         let nextX = this.x + dx * this.speed * dt;
         let nextY = this.y + dy * this.speed * dt;
         
-        // BOSS MODUNDA SAFE ZONE GİRİŞİ YASAK
         if (Game.bossMode) {
              let distToShop = Math.sqrt((nextX - Game.shop.x)**2 + (nextY - Game.shop.y)**2);
-             // SafeZoneRadius'dan biraz daha büyük alalım ki sınıra yapışsın
              let limit = Game.shop.safeZoneRadius + this.radius;
              if (distToShop < limit) {
-                 // İçeri girmeye çalışıyor, engelle
-                 // Basit çözüm: Eski pozisyonunda kalsın veya geri itilsin
-                 // Vektör matematiği ile sınırda kaymasını sağlayalım
                  let angle = Math.atan2(nextY - Game.shop.y, nextX - Game.shop.x);
                  nextX = Game.shop.x + Math.cos(angle) * limit;
                  nextY = Game.shop.y + Math.sin(angle) * limit;
@@ -68,7 +64,6 @@ class Player {
         let distShop = Math.sqrt((this.x - Game.shop.x)**2 + (this.y - Game.shop.y)**2);
         let inSafeZone = distShop < Game.shop.safeZoneRadius;
         
-        // Eğer boss modundaysak safe zone zaten yasak, ama yine de kontrol edelim
         this.weapon.canShoot = !inSafeZone;
         this.weapon.update(dt);
         
@@ -188,8 +183,9 @@ class Bot {
         this.x = x;
         this.y = y;
         this.radius = 20;
-        this.speed = 280; // Oyuncudan hızlı
+        this.speed = 280; 
         this.weapon = new WeaponController(this);
+        // Başlangıçta oyuncunun silahını kopyala
         this.weapon.activeWeapon = Game.player.weapon.activeWeapon; 
         this.targetEnemy = null;
     }
@@ -198,29 +194,36 @@ class Bot {
         if (this.weapon.activeWeapon.name !== Game.player.weapon.activeWeapon.name) {
              this.weapon.activeWeapon = Game.player.weapon.activeWeapon;
         }
-        this.weapon.modifiers = Game.player.weapon.modifiers;
 
-        // BOT HAREKET MANTIĞI: OYUNCUYA YAPIŞIK
-        let distToPlayer = Math.sqrt((this.x - Game.player.x)**2 + (this.y - Game.player.y)**2);
+        // --- BOT NERF VE AYRIŞTIRMA ---
+        // Oyuncunun statlarını referans olarak alırsak, botu değiştirince oyuncu da değişir.
+        // Bu yüzden değerleri kopyalayıp (clone) sonra azaltıyoruz.
         
+        let playerMods = Game.player.weapon.modifiers;
+        this.weapon.modifiers = { 
+            damage: playerMods.damage,
+            fireRate: playerMods.fireRate,
+            count: playerMods.count,
+            speed: playerMods.speed,
+            pierce: playerMods.pierce
+        };
+
+        // BOT GÜCÜNÜ KISMA (NERF)
+        this.weapon.modifiers.damage *= 0.35; // Hasarı oyuncunun %35'i olsun.
+        this.weapon.modifiers.fireRate *= 1.5; // Ateş etme bekleme süresi %50 artsın (daha yavaş).
+
+        // BOT HAREKET MANTIĞI
+        let distToPlayer = Math.sqrt((this.x - Game.player.x)**2 + (this.y - Game.player.y)**2);
         let moveX = 0, moveY = 0;
 
-        // "Uzak kalmasın çok dibime de girmesin"
-        // 50 ile 120 birim mesafe iyidir.
         if (distToPlayer > 120) {
-            // Çok uzak, yaklaş
             moveX = Game.player.x - this.x;
             moveY = Game.player.y - this.y;
         } else if (distToPlayer < 50) {
-            // Çok yakın, azıcık uzaklaş
             moveX = this.x - Game.player.x;
             moveY = this.y - Game.player.y;
-        } else {
-            // Mesafe ideal, oyuncu hareket ediyorsa ona uy
-            // Burada ek bir şey yapmaya gerek yok, üstteki bloklar halleder.
         }
 
-        // Hareketi uygula
         if (moveX !== 0 || moveY !== 0) {
             let len = Math.sqrt(moveX*moveX + moveY*moveY);
             moveX /= len;
@@ -233,12 +236,10 @@ class Bot {
         this.y = Math.max(this.radius, Math.min(this.y, Game.map.height - this.radius));
 
         // BOT ATEŞ MANTIĞI
-        // Safe Zone kontrolü
         let distShop = Math.sqrt((this.x - Game.shop.x)**2 + (this.y - Game.shop.y)**2);
         let inSafeZone = distShop < Game.shop.safeZoneRadius;
 
         if (!inSafeZone) {
-            // En yakın düşmanı bul
             let closestEnemy = null;
             let minDist = 700; 
 
@@ -256,11 +257,11 @@ class Bot {
                 this.weapon.timer -= dt;
                 if (this.weapon.timer <= 0) {
                     this.botShoot(this.targetEnemy);
-                    this.weapon.timer = this.weapon.activeWeapon.fireRate * (this.weapon.modifiers.fireRate || 1);
+                    this.weapon.timer = this.weapon.activeWeapon.fireRate * this.weapon.modifiers.fireRate;
                 }
             }
         } else {
-            this.targetEnemy = null; // Ateş etme
+            this.targetEnemy = null; 
         }
     }
 
