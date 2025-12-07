@@ -22,7 +22,6 @@ class Player {
         this.weapon = new WeaponController(this);
         this.applySkinStats();
         
-        // Regen Loop
         setInterval(() => {
             if (this.hp < this.maxHp && this.regen > 0 && !Game.isPaused) {
                 this.hp = Math.min(this.maxHp, this.hp + this.regen);
@@ -47,14 +46,29 @@ class Player {
 
         let nextX = this.x + dx * this.speed * dt;
         let nextY = this.y + dy * this.speed * dt;
+        
+        // BOSS MODUNDA SAFE ZONE GİRİŞİ YASAK
+        if (Game.bossMode) {
+             let distToShop = Math.sqrt((nextX - Game.shop.x)**2 + (nextY - Game.shop.y)**2);
+             // SafeZoneRadius'dan biraz daha büyük alalım ki sınıra yapışsın
+             let limit = Game.shop.safeZoneRadius + this.radius;
+             if (distToShop < limit) {
+                 // İçeri girmeye çalışıyor, engelle
+                 // Basit çözüm: Eski pozisyonunda kalsın veya geri itilsin
+                 // Vektör matematiği ile sınırda kaymasını sağlayalım
+                 let angle = Math.atan2(nextY - Game.shop.y, nextX - Game.shop.x);
+                 nextX = Game.shop.x + Math.cos(angle) * limit;
+                 nextY = Game.shop.y + Math.sin(angle) * limit;
+             }
+        }
 
         this.x = Math.max(this.radius, Math.min(nextX, Game.map.width - this.radius));
         this.y = Math.max(this.radius, Math.min(nextY, Game.map.height - this.radius));
 
-        // Safe Zone Kontrolü: İçerdeyken ateş edemez
         let distShop = Math.sqrt((this.x - Game.shop.x)**2 + (this.y - Game.shop.y)**2);
         let inSafeZone = distShop < Game.shop.safeZoneRadius;
         
+        // Eğer boss modundaysak safe zone zaten yasak, ama yine de kontrol edelim
         this.weapon.canShoot = !inSafeZone;
         this.weapon.update(dt);
         
@@ -75,7 +89,6 @@ class Player {
         ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
         ctx.shadowColor = color; ctx.shadowBlur = 15;
 
-        // Silah
         let angle = Math.atan2(Game.mouse.worldY - this.y, Game.mouse.worldX - this.x);
         ctx.save();
         ctx.translate(this.x, this.y);
@@ -88,7 +101,7 @@ class Player {
 
     takeDamage(amount) {
         let distToShop = Math.sqrt((this.x - Game.shop.x)**2 + (this.y - Game.shop.y)**2);
-        if (distToShop < Game.shop.safeZoneRadius) return; // Güvenli bölgede hasar almaz
+        if (distToShop < Game.shop.safeZoneRadius && !Game.bossMode) return; 
 
         let reducedAmount = amount * (1 - this.armor);
         this.hp -= reducedAmount;
@@ -166,77 +179,45 @@ class Player {
         this.resetLevelStats();
         this.hp = this.maxHp; 
         UI.updateLevel(this.level);
-        UI.showUpgradeMenu(false); // Normal Level Up
+        UI.showUpgradeMenu();
     }
 }
 
-// YARDIMCI BOT SINIFI
 class Bot {
     constructor(x, y) {
         this.x = x;
         this.y = y;
         this.radius = 20;
-        this.speed = 260; // Oyuncudan bir tık hızlı ki yetişsin
-        // Silah kontrolcüsü, sahibinin (player) değil kendisinin (bot) koordinatlarını kullanmalı.
-        // Ancak WeaponController 'owner' alıyor. Botu owner olarak vereceğiz.
+        this.speed = 280; // Oyuncudan hızlı
         this.weapon = new WeaponController(this);
-        this.weapon.activeWeapon = Game.player.weapon.activeWeapon; // Oyuncunun silahını kopyala
-        
-        // Botun hedefi
+        this.weapon.activeWeapon = Game.player.weapon.activeWeapon; 
         this.targetEnemy = null;
     }
 
     update(dt) {
-        // 1. Silah Senkronizasyonu (Oyuncu değiştirirse bot da değiştirsin)
-        // Ancak modifiyeler vs. uğraştırıcı, direkt referansı kopyalayalım.
         if (this.weapon.activeWeapon.name !== Game.player.weapon.activeWeapon.name) {
              this.weapon.activeWeapon = Game.player.weapon.activeWeapon;
         }
-        // Stat kopyalama (Basitçe)
         this.weapon.modifiers = Game.player.weapon.modifiers;
 
-        // 2. Hareket Mantığı (Oyuncuyu takip et ama düşmana yaklaş)
+        // BOT HAREKET MANTIĞI: OYUNCUYA YAPIŞIK
         let distToPlayer = Math.sqrt((this.x - Game.player.x)**2 + (this.y - Game.player.y)**2);
         
-        // En yakın düşmanı bul
-        let closestEnemy = null;
-        let minDist = 600; // Görüş menzili
-
-        Game.enemies.forEach(e => {
-            let d = Math.sqrt((this.x - e.x)**2 + (this.y - e.y)**2);
-            if (d < minDist) {
-                minDist = d;
-                closestEnemy = e;
-            }
-        });
-        
-        this.targetEnemy = closestEnemy;
-
         let moveX = 0, moveY = 0;
 
-        if (distToPlayer > 300) {
-            // Oyuncudan çok uzaksa oyuncuya koş
+        // "Uzak kalmasın çok dibime de girmesin"
+        // 50 ile 120 birim mesafe iyidir.
+        if (distToPlayer > 120) {
+            // Çok uzak, yaklaş
             moveX = Game.player.x - this.x;
             moveY = Game.player.y - this.y;
-        } else if (closestEnemy) {
-            // Düşman varsa ve oyuncuya yakınsam, düşmandan menzil koru ama ateş et
-            // Kiting mantığı: Çok yakınsa kaç, uzaksa yaklaş
-            let distToEnemy = Math.sqrt((this.x - closestEnemy.x)**2 + (this.y - closestEnemy.y)**2);
-            if (distToEnemy < 150) {
-                moveX = this.x - closestEnemy.x; // Kaç
-                moveY = this.y - closestEnemy.y;
-            } else {
-                // Pozisyon koru, etrafında dön veya hafif yaklaş
-                // Basitlik için: Olduğu yerde dursun ateş etsin
-                moveX = 0;
-                moveY = 0;
-            }
+        } else if (distToPlayer < 50) {
+            // Çok yakın, azıcık uzaklaş
+            moveX = this.x - Game.player.x;
+            moveY = this.y - Game.player.y;
         } else {
-            // Düşman yok, oyuncuya yapış
-            if (distToPlayer > 80) {
-                moveX = Game.player.x - this.x;
-                moveY = Game.player.y - this.y;
-            }
+            // Mesafe ideal, oyuncu hareket ediyorsa ona uy
+            // Burada ek bir şey yapmaya gerek yok, üstteki bloklar halleder.
         }
 
         // Hareketi uygula
@@ -248,26 +229,42 @@ class Bot {
             this.y += moveY * this.speed * dt;
         }
 
-        // Sınırlar
         this.x = Math.max(this.radius, Math.min(this.x, Game.map.width - this.radius));
         this.y = Math.max(this.radius, Math.min(this.y, Game.map.height - this.radius));
 
-        // 3. Ateş Etme
-        if (this.targetEnemy) {
-            // WeaponController Game.mouse'a göre ateş ediyor. 
-            // Bot için WeaponController'ı hacklememiz lazım veya manuel ateşlemeliyiz.
-            // WeaponController'ı Bot için özelleştirmedik, o yüzden manuel ateşleyelim:
-            this.weapon.timer -= dt;
-            if (this.weapon.timer <= 0) {
-                 this.botShoot(this.targetEnemy);
-                 this.weapon.timer = this.weapon.activeWeapon.fireRate * (this.weapon.modifiers.fireRate || 1);
+        // BOT ATEŞ MANTIĞI
+        // Safe Zone kontrolü
+        let distShop = Math.sqrt((this.x - Game.shop.x)**2 + (this.y - Game.shop.y)**2);
+        let inSafeZone = distShop < Game.shop.safeZoneRadius;
+
+        if (!inSafeZone) {
+            // En yakın düşmanı bul
+            let closestEnemy = null;
+            let minDist = 700; 
+
+            Game.enemies.forEach(e => {
+                let d = Math.sqrt((this.x - e.x)**2 + (this.y - e.y)**2);
+                if (d < minDist) {
+                    minDist = d;
+                    closestEnemy = e;
+                }
+            });
+
+            this.targetEnemy = closestEnemy;
+
+            if (this.targetEnemy) {
+                this.weapon.timer -= dt;
+                if (this.weapon.timer <= 0) {
+                    this.botShoot(this.targetEnemy);
+                    this.weapon.timer = this.weapon.activeWeapon.fireRate * (this.weapon.modifiers.fireRate || 1);
+                }
             }
+        } else {
+            this.targetEnemy = null; // Ateş etme
         }
     }
 
-    // Bot için özel shoot fonksiyonu (WeaponController'dan türetilmiş mantık)
     botShoot(target) {
-        // Nişan alma (Hafif sapma ekleyelim, çok robotik olmasın)
         let angle = Math.atan2(target.y - this.y, target.x - this.x);
         angle += (Math.random() - 0.5) * 0.1;
 
@@ -286,11 +283,8 @@ class Bot {
     }
 
     draw(ctx) {
-        // Oyuncunun aynısı ama hafif şeffaf veya "BOT" yazısı var
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2);
-        
-        // Oyuncunun rengini al
         let color = Game.player.currentSkin ? Game.player.currentSkin.color : '#00d2ff';
         ctx.fillStyle = color;
         ctx.fill();
@@ -298,13 +292,11 @@ class Bot {
         ctx.strokeStyle = '#fff';
         ctx.stroke();
 
-        // Bot Yazısı
         ctx.fillStyle = '#fff';
         ctx.font = '10px Arial';
         ctx.textAlign = 'center';
         ctx.fillText("BOT", this.x, this.y - 25);
 
-        // Silah
         if (this.targetEnemy) {
             let angle = Math.atan2(this.targetEnemy.y - this.y, this.targetEnemy.x - this.x);
             ctx.save();
