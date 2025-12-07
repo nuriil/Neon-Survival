@@ -6,15 +6,14 @@ const ItemFactory = {
         Game.items.push(new Coin(x, y, value));
     },
     createChest: function() {
-        // Haritada rastgele bir yere sandık at
         let x = Math.random() * (Game.map.width - 200) + 100;
         let y = Math.random() * (Game.map.height - 200) + 100;
-        // Markete çok yakın olmasın
+        
         let d = Math.sqrt((x-Game.shop.x)**2 + (y-Game.shop.y)**2);
         if (d > Game.shop.safeZoneRadius + 100) {
             Game.chests.push(new Chest(x, y));
-            // Efekt: Sandık düştü işareti
-            Effects.showDamage(x, y, "SANDIK DÜŞTÜ!", "#ffa500");
+            // Ekranın tepesinde bildirim göster
+            UI.showNotification("SANDIK DÜŞTÜ!", "#00ff00");
         }
     }
 };
@@ -97,24 +96,40 @@ class Chest {
     open() {
         if(this.markedForDeletion) return;
         this.markedForDeletion = true;
-        Effects.spawnExplosion(this.x, this.y); // Görsel efekt
-        // Özel sandık menüsü (Sadece 1 kart, ama bedava özellik)
-        UI.showUpgradeMenu(true); 
+        Effects.spawnExplosion(this.x, this.y); 
+        
+        // SANDIK İÇERİĞİ: 500 - 3000 Coin
+        // Nadirlik Sistemi:
+        // %60: 500 - 1000
+        // %30: 1000 - 2000
+        // %10: 2000 - 3000
+        
+        let amount = 0;
+        let r = Math.random();
+        
+        if (r < 0.6) {
+            amount = Math.floor(500 + Math.random() * 500);
+        } else if (r < 0.9) {
+            amount = Math.floor(1000 + Math.random() * 1000);
+        } else {
+            amount = Math.floor(2000 + Math.random() * 1000);
+        }
+
+        Game.player.gainCoins(amount);
+        UI.showNotification("SANDIK AÇILDI: " + amount + " 💰", "#FFD700");
     }
 
     draw(ctx) {
         ctx.save();
         ctx.translate(this.x, this.y);
         
-        // Hazine sandığı görüntüsü (Basit geometrik)
-        ctx.fillStyle = '#8B4513'; // Kahverengi
+        ctx.fillStyle = '#8B4513'; 
         ctx.fillRect(-20, -15, 40, 30);
         
-        ctx.fillStyle = '#FFD700'; // Altın şeritler
+        ctx.fillStyle = '#FFD700'; 
         ctx.fillRect(-20, -5, 40, 5);
         ctx.fillRect(-5, -15, 10, 30);
         
-        // Parlama efekti
         ctx.shadowColor = '#ffd700';
         ctx.shadowBlur = 20;
         ctx.strokeStyle = '#fff';
@@ -123,7 +138,6 @@ class Chest {
         
         ctx.shadowBlur = 0;
         
-        // Üstünde ok işareti
         let bob = Math.sin(Date.now()/200) * 5;
         ctx.fillStyle = '#00ff00';
         ctx.beginPath();
