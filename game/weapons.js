@@ -1,7 +1,9 @@
+// weapons.js
+// SHOTGUN: fireRate 2.2 (Yavaş), Damage 80 (Çok Yüksek), Pierce 3 (Delici)
 const WEAPONS = [
     { name: 'PISTOL', price: 0, fireRate: 0.4, damage: 25, speed: 800, count: 1, spread: 0.05, color: '#ffff00', pierce: 1 },
     { name: 'MACHINE GUN', price: 1500, fireRate: 0.12, damage: 15, speed: 900, count: 1, spread: 0.15, color: '#00ff00', pierce: 1 },
-    { name: 'SHOTGUN', price: 3000, fireRate: 1.0, damage: 15, speed: 700, count: 6, spread: 0.5, color: '#ffaa00', pierce: 2 },
+    { name: 'SHOTGUN', price: 3000, fireRate: 2.2, damage: 80, speed: 800, count: 6, spread: 0.5, color: '#ffaa00', pierce: 3 },
     { name: 'SNIPER', price: 6000, fireRate: 1.5, damage: 200, speed: 1500, count: 1, spread: 0.0, color: '#00d2ff', pierce: 10 }
 ];
 
@@ -27,7 +29,7 @@ class WeaponController {
         if (index >= 0 && index < WEAPONS.length) {
             this.currentWeaponIndex = index;
             this.activeWeapon = WEAPONS[index];
-            this.timer = 0.5; 
+            this.timer = 0.5; // Silah değiştirince yarım saniye bekleme
             const uiName = document.getElementById('weapon-name');
             if(uiName) uiName.innerText = this.activeWeapon.name;
         }
@@ -37,8 +39,10 @@ class WeaponController {
         this.timer -= dt;
         if (Game.isShopOpen || !this.canShoot) return;
 
+        // Sadece oyuncu için mouse tıklama kontrolü
         if (this.owner === Game.player && Game.mouse.down && this.timer <= 0) {
             this.shoot();
+            // FireRate ne kadar yüksekse (örn: 2.2), bekleme süresi o kadar uzar.
             this.timer = this.activeWeapon.fireRate * this.modifiers.fireRate;
         }
     }
