@@ -13,14 +13,14 @@ const Game = {
     
     // Varlıklar
     player: null,
-    bots: [], 
+    bots: [], // Satın alınan yardımcılar
     map: null,
     camera: { x: 0, y: 0 },
     enemies: [],
-    bullets: [], 
-    enemyBullets: [], 
+    bullets: [], // Oyuncu mermileri
+    enemyBullets: [], // Boss mermileri
     items: [],
-    chests: [], 
+    chests: [], // Hazine sandıkları
     particles: [],
     
     score: 0,
@@ -33,15 +33,15 @@ const Game = {
         radius: 100, 
         safeZoneRadius: 350, 
         active: true,
-        botPrice: 1200, 
-        botCount: 0 
+        botPrice: 1200, // Bot başlangıç fiyatı
+        botCount: 0 // Kaç bot alındı
     },
 
     keys: {},
     mouse: { x: 0, y: 0, worldX: 0, worldY: 0, down: false },
 
     // Zamanlayıcılar
-    chestTimer: 60, // İlk sandık 60 saniye sonra
+    chestTimer: 0,
 
     init: function() {
         this.canvas = document.getElementById('gameCanvas');
@@ -79,6 +79,7 @@ const Game = {
             }
             if (e.code === 'KeyE') this.checkShopInteraction();
             
+            // Silah Değişimi
             if (['Digit1', 'Digit2', 'Digit3', 'Digit4'].includes(e.code)) {
                 const weaponIndex = parseInt(e.key) - 1;
                 if (this.player.ownedWeapons.includes(weaponIndex)) {
@@ -97,9 +98,6 @@ const Game = {
     },
 
     checkShopInteraction: function() {
-        // Boss modundaysak markete giremeyiz, etkileşim yok
-        if (this.bossMode) return;
-
         let dist = Math.sqrt((this.player.x - this.shop.x)**2 + (this.player.y - this.shop.y)**2);
         if (dist < this.shop.radius + 100) {
             if (this.isShopOpen) UI.closeShop();
@@ -142,6 +140,7 @@ const Game = {
         this.mouse.worldX = this.mouse.x + this.camera.x;
         this.mouse.worldY = this.mouse.y + this.camera.y;
 
+        // Update Entity'leri
         this.player.update(dt);
         
         // Botlar (Boss savaşında yok olurlar)
@@ -151,27 +150,27 @@ const Game = {
 
         EnemySpawner.update(dt);
         
+        // Mermiler
         this.bullets.forEach((b, i) => {
             b.update(dt);
             if (b.markedForDeletion) this.bullets.splice(i, 1);
         });
 
+        // Düşman Mermileri (Boss Ateşi)
         this.enemyBullets.forEach((b, i) => {
             b.update(dt);
             if (b.markedForDeletion) this.enemyBullets.splice(i, 1);
         });
 
+        // Düşmanlar
         this.enemies.forEach((e, i) => {
             e.update(dt);
             if (e.markedForDeletion) {
+                // Boss öldü mü?
                 if (e.type === 'boss') {
-                    // BOSS ÖLDÜĞÜNDE BURASI ÇALIŞIR
-                    this.bossMode = false; // Modu kapat
-                    ItemFactory.createCoin(e.x, e.y, 2000); // Ödül
+                    this.bossMode = false; // Normal moda dön
+                    ItemFactory.createCoin(e.x, e.y, 2000); // Büyük ödül
                     UI.showBossWarning(false); // Yazıyı kaldır
-                    
-                    // Boss ölünce düşman spawn timer'ını sıfırla ki hemen düşman gelmesin, nefes alalım
-                    EnemySpawner.timer = 3.0; 
                 } else {
                     ItemFactory.createCoin(e.x, e.y, 30);
                     if (Math.random() < 0.6) ItemFactory.createXP(e.x, e.y, 15);
@@ -180,6 +179,7 @@ const Game = {
             }
         });
 
+        // Eşyalar
         this.items.forEach((item, i) => {
             item.update(dt);
             if (item.markedForDeletion) this.items.splice(i, 1);
@@ -190,8 +190,7 @@ const Game = {
             this.chestTimer -= dt;
             if (this.chestTimer <= 0) {
                 ItemFactory.createChest();
-                // Rastgele bir süre sonra tekrar (45-90 sn)
-                this.chestTimer = Math.random() * 45 + 45; 
+                this.chestTimer = Math.random() * 60 + 60; // 60-120 saniyede bir
             }
         }
         
@@ -211,22 +210,9 @@ const Game = {
         this.ctx.translate(-this.camera.x, -this.camera.y);
 
         this.map.draw(this.ctx, this.camera);
-        
-        // Boss Modunda Safe Zone kırmızı yanıp sönmeli veya bariyer gibi görünmeli
-        if (this.bossMode) {
-            this.ctx.save();
-            this.ctx.beginPath();
-            this.ctx.arc(this.shop.x, this.shop.y, this.shop.safeZoneRadius, 0, Math.PI * 2);
-            this.ctx.strokeStyle = `rgba(255, 0, 0, ${Math.abs(Math.sin(Date.now()/200))})`;
-            this.ctx.lineWidth = 10;
-            this.ctx.stroke();
-            this.ctx.fillStyle = 'rgba(255, 0, 0, 0.1)';
-            this.ctx.fill();
-            this.ctx.restore();
-        }
-
         this.map.drawShop(this.ctx);
 
+        // Yerdeki Eşyalar ve Sandıklar
         this.items.forEach(i => i.draw(this.ctx));
         this.chests.forEach(c => c.draw(this.ctx));
 
@@ -235,6 +221,7 @@ const Game = {
         
         this.enemies.forEach(e => e.draw(this.ctx));
         
+        // Botlar
         if (!this.bossMode) {
             this.bots.forEach(b => b.draw(this.ctx));
         }
@@ -243,22 +230,23 @@ const Game = {
         
         this.ctx.shadowBlur = 0;
 
+        // Mermiler
         this.ctx.globalCompositeOperation = 'lighter';
         this.bullets.forEach(b => b.draw(this.ctx));
+        
+        // Düşman Mermileri (Kırmızı/Turuncu)
         this.enemyBullets.forEach(b => b.draw(this.ctx));
         this.ctx.globalCompositeOperation = 'source-over';
 
         Effects.draw(this.ctx);
         
         // Market Yazısı
-        if (!this.bossMode) {
-            let dist = Math.sqrt((this.player.x - this.shop.x)**2 + (this.player.y - this.shop.y)**2);
-            if (dist < this.shop.radius + 100) {
-                this.ctx.fillStyle = "white";
-                this.ctx.font = "20px Arial";
-                this.ctx.textAlign = "center";
-                this.ctx.fillText("Market için 'E' bas", this.shop.x, this.shop.y - 120);
-            }
+        let dist = Math.sqrt((this.player.x - this.shop.x)**2 + (this.player.y - this.shop.y)**2);
+        if (dist < this.shop.radius + 100) {
+            this.ctx.fillStyle = "white";
+            this.ctx.font = "20px Arial";
+            this.ctx.textAlign = "center";
+            this.ctx.fillText("Market için 'E' bas", this.shop.x, this.shop.y - 120);
         }
 
         this.ctx.restore();
@@ -270,6 +258,7 @@ const Game = {
 
 const CollisionManager = {
     check: function() {
+        // 1. Oyuncu Mermileri vs Düşmanlar
         Game.bullets.forEach(bullet => {
             Game.enemies.forEach(enemy => {
                 if (this.isColliding(bullet, enemy)) {
@@ -279,6 +268,7 @@ const CollisionManager = {
                     Effects.spawnHitEffect(bullet.x, bullet.y);
                 }
             });
+            // Mermiler vs Engeller
             Game.map.obstacles.forEach(obs => {
                 if (this.isColliding(bullet, obs)) {
                     bullet.markedForDeletion = true;
@@ -287,11 +277,16 @@ const CollisionManager = {
             });
         });
 
+        // 2. Boss Mermileri vs Oyuncu (ve Botlar)
         Game.enemyBullets.forEach(bullet => {
+            // Oyuncuya değdi mi?
             if (this.isColliding(bullet, Game.player)) {
                 Game.player.takeDamage(bullet.damage);
                 bullet.markedForDeletion = true;
             }
+            // Botlara değdi mi? (Opsiyonel, şimdilik botlar hasar almasın karmaşa olmasın)
+            
+            // Duvarlara değdi mi?
              Game.map.obstacles.forEach(obs => {
                 if (this.isColliding(bullet, obs)) {
                     bullet.markedForDeletion = true;
@@ -300,30 +295,37 @@ const CollisionManager = {
             });
         });
 
+        // 3. Düşman vs Oyuncu / Botlar
         Game.enemies.forEach(enemy => {
             if (this.dist(enemy.x, enemy.y, Game.player.x, Game.player.y) < (enemy.radius + Game.player.radius)) {
                 Game.player.takeDamage(enemy.damage);
             }
+            // Botlarla çarpışma (Botlar sadece iter)
             if (!Game.bossMode) {
                 Game.bots.forEach(bot => {
                      if (this.dist(enemy.x, enemy.y, bot.x, bot.y) < (enemy.radius + bot.radius)) {
+                        // İtme efekti
                         let angle = Math.atan2(enemy.y - bot.y, enemy.x - bot.x);
                         enemy.pushX += Math.cos(angle) * 100;
                         enemy.pushY += Math.sin(angle) * 100;
                     }
                 });
             }
+            
             this.resolveMapCollision(enemy);
         });
 
+        // 4. Oyuncu vs Engel & Sandık
         this.resolveMapCollision(Game.player);
         
+        // Oyuncu vs Sandık (Collision değil, trigger)
         Game.chests.forEach(chest => {
             if (this.isColliding(Game.player, chest)) {
                 chest.open();
             }
         });
 
+        // 5. Eşyalar vs Oyuncu
         Game.items.forEach(item => {
             let d = this.dist(item.x, item.y, Game.player.x, Game.player.y);
             if (d < Game.player.magnetRange) {
