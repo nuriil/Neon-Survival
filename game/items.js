@@ -12,12 +12,9 @@ const ItemFactory = {
         let d = Math.sqrt((x-Game.shop.x)**2 + (y-Game.shop.y)**2);
         if (d > Game.shop.safeZoneRadius + 100) {
             Game.chests.push(new Chest(x, y));
+            // Ekranın tepesinde bildirim göster
             UI.showNotification("SANDIK DÜŞTÜ!", "#00ff00");
         }
-    },
-    // YENİ: Pasif eşya oluşturma fonksiyonu
-    createPassiveItem: function(x, y, itemId) {
-        Game.items.push(new PassiveItemDrop(x, y, itemId));
     }
 };
 
@@ -101,6 +98,12 @@ class Chest {
         this.markedForDeletion = true;
         Effects.spawnExplosion(this.x, this.y); 
         
+        // SANDIK İÇERİĞİ: 500 - 3000 Coin
+        // Nadirlik Sistemi:
+        // %60: 500 - 1000
+        // %30: 1000 - 2000
+        // %10: 2000 - 3000
+        
         let amount = 0;
         let r = Math.random();
         
@@ -126,3 +129,23 @@ class Chest {
         ctx.fillStyle = '#FFD700'; 
         ctx.fillRect(-20, -5, 40, 5);
         ctx.fillRect(-5, -15, 10, 30);
+        
+        ctx.shadowColor = '#ffd700';
+        ctx.shadowBlur = 20;
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(-20, -15, 40, 30);
+        
+        ctx.shadowBlur = 0;
+        
+        let bob = Math.sin(Date.now()/200) * 5;
+        ctx.fillStyle = '#00ff00';
+        ctx.beginPath();
+        ctx.moveTo(0, -30 + bob);
+        ctx.lineTo(-10, -45 + bob);
+        ctx.lineTo(10, -45 + bob);
+        ctx.fill();
+        
+        ctx.restore();
+    }
+}
